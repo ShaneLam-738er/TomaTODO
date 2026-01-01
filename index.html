@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>25:00 · 番茄钟</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --card: #111827;
+      --primary: #22c55e;
+      --break: #38bdf8;
+      --text: #e5e7eb;
+      --muted: #9ca3af;
+    }
+
+    * {
+      box-sizing: border-box;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: linear-gradient(135deg, #020617, #020617 40%, #020617);
+      color: var(--text);
+    }
+
+    .card {
+      background: radial-gradient(1200px circle at top, #1f2937, var(--card));
+      padding: 40px 48px;
+      border-radius: 20px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+      text-align: center;
+      width: 320px;
+    }
+
+    .mode {
+      font-size: 14px;
+      letter-spacing: 2px;
+      color: var(--muted);
+      margin-bottom: 12px;
+    }
+
+    .time {
+      font-size: 56px;
+      font-weight: 600;
+      margin: 16px 0 24px;
+    }
+
+    .controls {
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+    }
+
+    button {
+      appearance: none;
+      border: none;
+      padding: 10px 18px;
+      border-radius: 999px;
+      font-size: 14px;
+      cursor: pointer;
+      color: #020617;
+      background: var(--primary);
+      transition: transform 0.1s ease, opacity 0.1s ease;
+    }
+
+    button.secondary {
+      background: #334155;
+      color: var(--text);
+    }
+
+    button:hover {
+      transform: translateY(-1px);
+      opacity: 0.95;
+    }
+
+    footer {
+      margin-top: 16px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .stats {
+      margin-top: 16px;
+      font-size: 14px;
+      color: var(--text);
+    }
+
+    .plan {
+      margin-top: 16px;
+    }
+
+    .plan input {
+      width: 100%;
+      padding: 10px 14px;
+      border-radius: 12px;
+      border: 1px solid #334155;
+      background: #020617;
+      color: var(--text);
+      font-size: 14px;
+      outline: none;
+    }
+
+    .plan input::placeholder {
+      color: var(--muted);
+    }
+
+    .plan input:focus {
+      border-color: var(--primary);
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="mode" id="modeText">专注中</div>
+    <div class="time" id="timeText">25:00</div>
+    <div class="controls">
+      <button id="startBtn">开始</button>
+      <button id="resetBtn" class="secondary">重置</button>
+    </div>
+    <div class="plan">
+      <input type="text" id="planInput" placeholder="本次番茄钟计划（例如：写模电作业第3题）" />
+    </div>
+    <div class="stats" id="statsText">今日完成 0 轮 · 累计 0 分钟</div>
+    <footer>25 分钟专注 · 5 分钟休息（双击导出记录）</footer>
+  </div>
+
+  <script>
+    const WORK_TIME = 25 * 60;
+    const BREAK_TIME = 5 * 60;
+
+    let isRunning = false;
+    let isBreak = false;
+    let remaining = WORK_TIME;
+    let timer = null;
+
+    const timeText = document.getElementById('timeText');
+    const modeText = document.getElementById('modeText');
+    const startBtn = document.getElementById('startBtn');
+    const resetBtn = document.getElementById('resetBtn');
+    const planInput = document.getElementById('planInput');
+    const statsText = document.getElementById('statsText');
+
+    // ===== 提醒音 =====
+    function playBeep() {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.value = 880;
+      gain.gain.value = 0.2;
+      osc.connect(gain).connect(ctx.destination);
+      osc.start();
+      setTimeout(() => {
+        osc.stop();
+        ctx.close();
+      }, 500);
+    }
+
+    // ===== 日志存储 =====
+    const STORAGE_KEY = 'pomodoro_logs';
+
+    function loadLogs() {
+      return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+    }
+
+    function saveLog(entry) {
+      const logs = loadLogs();
+      logs.push(entry);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(logs));
+    }
+
+    function updateStats() {
+      const logs = loadLogs();
+      const todayStr = new Date().toDateString();
+      const todayLogs = logs.filter(l => new Date(l.time).toDateString() === todayStr);
+      const rounds = todayLogs.length;
+      const minutes = rounds * 25;
+      statsText.textContent = `今日完成 ${rounds} 轮 · 累计 ${minutes} 分钟`;
+    }
+
+    function format(sec) {
+      const m = Math.floor(sec / 60);
+      const s = sec % 60;
+      return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+    }
+
+    function updateUI() {
+      timeText.textContent = format(remaining);
+      modeText.textContent = isBreak ? '休息中' : '专注中';
+      const plan = planInput.value.trim();
+      document.title = `${format(remaining)} · ${isBreak ? '休息' : '专注'}${plan ? '｜' + plan : ''}`;
+      startBtn.textContent = isRunning ? '暂停' : '开始';
+      document.documentElement.style.setProperty(
+        '--primary',
+        isBreak ? 'var(--break)' : '#22c55e'
+      );
+    }
+
+    function tick() {
+      if (remaining > 0) {
+        remaining--;
+        updateUI();
+      } else {
+        playBeep();
+        // 完成一轮专注才记 log
+        if (!isBreak) {
+          saveLog({
+            time: new Date().toISOString(),
+            plan: planInput.value.trim()
+          });
+          updateStats();
+        }
+        isBreak = !isBreak;
+        remaining = isBreak ? BREAK_TIME : WORK_TIME;
+        updateUI();
+      }
+    }
+
+    startBtn.addEventListener('click', () => {
+      if (!isRunning) {
+        timer = setInterval(tick, 1000);
+        isRunning = true;
+      } else {
+        clearInterval(timer);
+        isRunning = false;
+      }
+      updateUI();
+    });
+
+    resetBtn.addEventListener('click', () => {
+      clearInterval(timer);
+      isRunning = false;
+      isBreak = false;
+      remaining = WORK_TIME;
+      updateUI();
+    });
+
+    // 双击导出 TXT
+    document.querySelector('footer').addEventListener('dblclick', () => {
+      const logs = loadLogs();
+      let text = 'Pomodoro Log\n\n';
+      logs.forEach(l => {
+        text += `[${new Date(l.time).toLocaleString()}] ${l.plan || '未填写计划'}\n`;
+      });
+      const blob = new Blob([text], { type: 'text/plain' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'pomodoro_log.txt';
+      a.click();
+      URL.revokeObjectURL(a.href);
+    });
+
+    // 初始化
+    updateUI();
+    updateStats();
+  </script>
+</body>
+</html>
