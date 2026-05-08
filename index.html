@@ -6,18 +6,16 @@
   <title>25:00 · 番茄钟</title>
   <style>
     :root {
-      --bg: #0f172a;
+      --bg: #020617;
       --card: #111827;
       --primary: #22c55e;
       --break: #38bdf8;
       --text: #e5e7eb;
       --muted: #9ca3af;
+      --line: #334155;
     }
 
-    * {
-      box-sizing: border-box;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial;
-    }
+    * { box-sizing: border-box; }
 
     body {
       margin: 0;
@@ -25,163 +23,428 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      background: linear-gradient(135deg, #020617, #020617 40%, #020617);
+      padding: 24px;
+      background: radial-gradient(900px circle at top, #111827, var(--bg) 55%);
       color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    }
+
+    .app {
+      width: min(380px, 100%);
+    }
+
+    .card,
+    .today-rail {
+      border: 1px solid rgba(148, 163, 184, 0.14);
+      background: linear-gradient(180deg, rgba(31, 41, 55, 0.92), rgba(17, 24, 39, 0.98));
+      box-shadow: 0 24px 70px rgba(0, 0, 0, 0.45);
     }
 
     .card {
-      background: radial-gradient(1200px circle at top, #1f2937, var(--card));
-      padding: 40px 48px;
-      border-radius: 20px;
-      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+      padding: 34px 32px 28px;
+      border-radius: 24px;
       text-align: center;
-      width: 320px;
     }
 
+    .today-rail {
+      position: fixed;
+      top: 24px;
+      right: 16px;
+      bottom: 24px;
+      width: 176px;
+      padding: 16px 14px;
+      border-radius: 20px 0 0 20px;
+      display: flex;
+      flex-direction: column;
+      opacity: 0.66;
+      transition: opacity 0.15s ease;
+      z-index: 2;
+    }
+
+    .today-rail:hover { opacity: 1; }
+
     .mode {
-      font-size: 14px;
-      letter-spacing: 2px;
+      font-size: 13px;
+      letter-spacing: 0.2em;
       color: var(--muted);
-      margin-bottom: 12px;
+      margin-bottom: 8px;
     }
 
     .time {
-      font-size: 56px;
-      font-weight: 600;
-      margin: 16px 0 24px;
+      font-size: clamp(52px, 14vw, 68px);
+      line-height: 1;
+      font-variant-numeric: tabular-nums;
+      font-weight: 700;
+      margin: 12px 0 22px;
+    }
+
+    .progress {
+      height: 7px;
+      overflow: hidden;
+      border-radius: 999px;
+      background: #020617;
+      border: 1px solid rgba(148, 163, 184, 0.14);
+      margin-bottom: 22px;
+    }
+
+    .progress span {
+      display: block;
+      height: 100%;
+      width: 0%;
+      border-radius: inherit;
+      background: var(--primary);
+      transition: width 0.25s ease;
     }
 
     .controls {
-      display: flex;
-      gap: 12px;
-      justify-content: center;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
     }
 
     button {
       appearance: none;
-      border: none;
-      padding: 10px 18px;
+      border: 0;
       border-radius: 999px;
-      font-size: 14px;
-      cursor: pointer;
+      padding: 11px 16px;
       color: #020617;
       background: var(--primary);
+      font-size: 14px;
+      cursor: pointer;
       transition: transform 0.1s ease, opacity 0.1s ease;
     }
 
+    button:hover { transform: translateY(-1px); opacity: 0.95; }
+    button:active { transform: translateY(0); }
+
     button.secondary {
+      color: var(--text);
       background: #334155;
-      color: var(--text);
     }
 
-    button:hover {
-      transform: translateY(-1px);
-      opacity: 0.95;
-    }
-
-    footer {
-      margin-top: 16px;
-      font-size: 12px;
+    button.ghost {
       color: var(--muted);
+      background: transparent;
+      border: 1px solid var(--line);
     }
 
-    .stats {
-      margin-top: 16px;
-      font-size: 14px;
-      color: var(--text);
+    .skip-row {
+      margin-top: 10px;
+      display: none;
     }
 
-    .plan {
-      margin-top: 16px;
-    }
+    .skip-row.show { display: block; }
 
-    .plan input {
+    .plan { margin-top: 18px; }
+
+    input {
       width: 100%;
-      padding: 10px 14px;
-      border-radius: 12px;
-      border: 1px solid #334155;
+      padding: 11px 14px;
+      border-radius: 14px;
+      border: 1px solid var(--line);
       background: #020617;
       color: var(--text);
       font-size: 14px;
       outline: none;
     }
 
-    .plan input::placeholder {
-      color: var(--muted);
+    input::placeholder { color: var(--muted); }
+    input:focus { border-color: var(--primary); }
+
+    .resume-note {
+      display: none;
+      margin-top: 12px;
+      padding: 10px 12px;
+      border: 1px solid rgba(34, 197, 94, 0.28);
+      border-radius: 14px;
+      background: rgba(34, 197, 94, 0.08);
+      color: #bbf7d0;
+      font-size: 13px;
+      line-height: 1.5;
+      text-align: left;
     }
 
-    .plan input:focus {
-      border-color: var(--primary);
+    .resume-note.show { display: block; }
+
+    .stats {
+      margin-top: 16px;
+      font-size: 14px;
+      line-height: 1.7;
+      color: var(--text);
+    }
+
+    .rail-title {
+      margin: 0 0 10px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+    }
+
+    .rail-summary {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+
+    .rail-summary div {
+      padding: 8px;
+      border-radius: 12px;
+      background: rgba(2, 6, 23, 0.32);
+      border: 1px solid rgba(148, 163, 184, 0.1);
+    }
+
+    .rail-summary strong {
+      display: block;
+      font-size: 18px;
+      line-height: 1;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .rail-summary span {
+      display: block;
+      margin-top: 5px;
+      color: var(--muted);
+      font-size: 11px;
+    }
+
+    .today-list {
+      flex: 1;
+      min-height: 0;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+      overflow: auto;
+    }
+
+    .today-list li {
+      padding: 9px 0;
+      border-top: 1px solid rgba(148, 163, 184, 0.11);
+    }
+
+    .today-list time {
+      display: block;
+      color: var(--muted);
+      font-size: 11px;
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+    }
+
+    .today-list .task {
+      display: block;
+      margin-top: 3px;
+      color: var(--text);
+      font-size: 12px;
+      line-height: 1.4;
+      word-break: break-word;
+    }
+
+    .empty-today {
+      margin: auto;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.6;
+      text-align: center;
+    }
+
+    details {
+      margin-top: 16px;
+      color: var(--muted);
+      font-size: 12px;
+      text-align: left;
+    }
+
+    summary {
+      cursor: pointer;
+      text-align: center;
+      list-style-position: inside;
+      user-select: none;
+    }
+
+    .settings {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px solid rgba(148, 163, 184, 0.14);
+    }
+
+    .settings label {
+      display: grid;
+      gap: 6px;
+    }
+
+    .settings input {
+      padding: 9px 10px;
+      border-radius: 10px;
+      font-size: 13px;
+    }
+
+    .footer-actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-top: 14px;
+    }
+
+    @media (max-width: 760px) {
+      body { align-items: flex-start; }
+      .today-rail {
+        position: static;
+        width: min(380px, 100%);
+        max-height: 220px;
+        margin: 14px auto 0;
+        border-radius: 20px;
+      }
+      .today-list { max-height: 140px; }
     }
   </style>
 </head>
 <body>
-  <div class="card">
-    <div class="mode" id="modeText">专注中</div>
-    <div class="time" id="timeText">25:00</div>
-    <div class="controls">
-      <button id="startBtn">开始</button>
-      <button id="resetBtn" class="secondary">重置</button>
-    </div>
-    <div class="plan">
-      <input type="text" id="planInput" placeholder="本次番茄钟计划（例如：写模电作业第3题）" />
-    </div>
-    <div class="stats" id="statsText">今日完成 0 轮 · 累计 0 分钟</div>
-    <footer>25 分钟专注 · 5 分钟休息（双击导出记录）</footer>
+  <div class="app">
+    <main class="card" aria-label="番茄钟">
+      <div class="mode" id="modeText">专注中</div>
+      <div class="time" id="timeText">25:00</div>
+
+      <div class="progress" aria-hidden="true"><span id="progressBar"></span></div>
+
+      <div class="controls">
+        <button id="startBtn">开始</button>
+        <button id="resetBtn" class="secondary">重置</button>
+      </div>
+
+      <div class="skip-row" id="skipRow">
+        <button id="skipBtn" class="ghost">跳过休息</button>
+      </div>
+
+      <div class="plan">
+        <input type="text" id="planInput" maxlength="60" placeholder="本次计划：例如 写模电作业第 3 题" autocomplete="off" />
+      </div>
+
+      <div class="resume-note" id="resumeNote">已恢复上次未完成的番茄钟，点击“开始”继续。</div>
+
+      <div class="stats" id="statsText">今日完成 0 轮 · 累计 0 分钟</div>
+
+      <details>
+        <summary>设置 / 导出</summary>
+        <div class="settings">
+          <label>专注分钟
+            <input id="workInput" type="number" min="1" max="120" />
+          </label>
+          <label>短休分钟
+            <input id="shortBreakInput" type="number" min="1" max="60" />
+          </label>
+          <label>长休分钟
+            <input id="longBreakInput" type="number" min="1" max="120" />
+          </label>
+          <label>每几轮长休
+            <input id="longBreakEveryInput" type="number" min="2" max="12" />
+          </label>
+        </div>
+        <div class="footer-actions">
+          <button id="exportBtn" class="ghost">导出 TXT</button>
+          <button id="clearBtn" class="ghost">清空记录</button>
+        </div>
+      </details>
+    </main>
   </div>
 
-  <script>
-    const WORK_TIME = 25 * 60;
-    const BREAK_TIME = 5 * 60;
+  <aside class="today-rail" aria-label="今日完成清单">
+    <p class="rail-title">今日</p>
+    <div class="rail-summary">
+      <div>
+        <strong id="todayRoundsText">0</strong>
+        <span>轮</span>
+      </div>
+      <div>
+        <strong id="todayMinutesText">0</strong>
+        <span>分钟</span>
+      </div>
+    </div>
+    <ul class="today-list" id="todayList"></ul>
+    <div class="empty-today" id="emptyToday">还没有记录</div>
+  </aside>
 
+  <script>
+    const STORAGE_KEY = 'pomodoro_logs';
+    const SETTINGS_KEY = 'pomodoro_settings';
+    const PLAN_KEY = 'pomodoro_plan_draft';
+    const SESSION_KEY = 'pomodoro_current_session';
+
+    const DEFAULT_SETTINGS = {
+      work: 25,
+      shortBreak: 5,
+      longBreak: 15,
+      longBreakEvery: 4
+    };
+
+    let settings = loadSettings();
     let isRunning = false;
     let isBreak = false;
-    let remaining = WORK_TIME;
+    let isLongBreak = false;
+    let remaining = settings.work * 60;
+    let totalForPhase = remaining;
     let timer = null;
+    let endAt = 0;
+    let phaseStartedAt = null;
+    let restoredSession = false;
 
-    const timeText = document.getElementById('timeText');
-    const modeText = document.getElementById('modeText');
-    const startBtn = document.getElementById('startBtn');
-    const resetBtn = document.getElementById('resetBtn');
-    const planInput = document.getElementById('planInput');
-    const statsText = document.getElementById('statsText');
+    const $ = (id) => document.getElementById(id);
+    const timeText = $('timeText');
+    const modeText = $('modeText');
+    const startBtn = $('startBtn');
+    const resetBtn = $('resetBtn');
+    const skipBtn = $('skipBtn');
+    const skipRow = $('skipRow');
+    const planInput = $('planInput');
+    const resumeNote = $('resumeNote');
+    const statsText = $('statsText');
+    const progressBar = $('progressBar');
+    const exportBtn = $('exportBtn');
+    const clearBtn = $('clearBtn');
+    const todayRoundsText = $('todayRoundsText');
+    const todayMinutesText = $('todayMinutesText');
+    const todayList = $('todayList');
+    const emptyToday = $('emptyToday');
 
-    // ===== 提醒音 =====
-    function playBeep() {
-      const ctx = new (window.AudioContext || window.webkitAudioContext)();
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.type = 'sine';
-      osc.frequency.value = 880;
-      gain.gain.value = 0.2;
-      osc.connect(gain).connect(ctx.destination);
-      osc.start();
-      setTimeout(() => {
-        osc.stop();
-        ctx.close();
-      }, 500);
+    const workInput = $('workInput');
+    const shortBreakInput = $('shortBreakInput');
+    const longBreakInput = $('longBreakInput');
+    const longBreakEveryInput = $('longBreakEveryInput');
+
+    function safeJSON(value, fallback) {
+      try { return JSON.parse(value) ?? fallback; } catch { return fallback; }
     }
 
-    // ===== 日志存储 =====
-    const STORAGE_KEY = 'pomodoro_logs';
+    function loadSettings() {
+      return { ...DEFAULT_SETTINGS, ...safeJSON(localStorage.getItem(SETTINGS_KEY), {}) };
+    }
+
+    function saveSettings() {
+      localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+    }
 
     function loadLogs() {
-      return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+      return safeJSON(localStorage.getItem(STORAGE_KEY), []);
+    }
+
+    function saveLogs(logs) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(logs));
     }
 
     function saveLog(entry) {
       const logs = loadLogs();
       logs.push(entry);
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(logs));
+      saveLogs(logs);
     }
 
-    function updateStats() {
-      const logs = loadLogs();
-      const todayStr = new Date().toDateString();
-      const todayLogs = logs.filter(l => new Date(l.time).toDateString() === todayStr);
-      const rounds = todayLogs.length;
-      const minutes = rounds * 25;
-      statsText.textContent = `今日完成 ${rounds} 轮 · 累计 ${minutes} 分钟`;
+    function todayKey(date = new Date()) {
+      const y = date.getFullYear();
+      const m = String(date.getMonth() + 1).padStart(2, '0');
+      const d = String(date.getDate()).padStart(2, '0');
+      return `${y}-${m}-${d}`;
     }
 
     function format(sec) {
@@ -190,75 +453,325 @@
       return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
     }
 
+    function formatClock(value) {
+      const date = new Date(value);
+      return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    }
+
+    function getLogStart(log) {
+      if (log.startTime) return log.startTime;
+      const end = new Date(log.time).getTime();
+      const minutes = log.minutes || settings.work;
+      return new Date(end - minutes * 60 * 1000).toISOString();
+    }
+
+    function hasMeaningfulSession() {
+      const hasProgress = remaining < totalForPhase;
+      const hasPlan = planInput.value.trim().length > 0;
+      return isRunning || isBreak || hasProgress || hasPlan;
+    }
+
+    function saveSession() {
+      if (!hasMeaningfulSession()) {
+        localStorage.removeItem(SESSION_KEY);
+        return;
+      }
+
+      const elapsed = Math.max(0, totalForPhase - remaining);
+      const session = {
+        savedAt: Date.now(),
+        phaseStartedAt: phaseStartedAt || (elapsed ? Date.now() - elapsed * 1000 : null),
+        isBreak,
+        isLongBreak,
+        remaining,
+        totalForPhase,
+        plan: planInput.value,
+        settings
+      };
+      localStorage.setItem(SESSION_KEY, JSON.stringify(session));
+    }
+
+    function clearSession() {
+      localStorage.removeItem(SESSION_KEY);
+      restoredSession = false;
+      phaseStartedAt = null;
+      resumeNote.classList.remove('show');
+    }
+
+    function restoreSession() {
+      const session = safeJSON(localStorage.getItem(SESSION_KEY), null);
+      if (!session || !Number.isFinite(session.remaining) || !Number.isFinite(session.totalForPhase)) return;
+
+      const validTotal = Math.max(1, session.totalForPhase);
+      const validRemaining = Math.max(1, Math.min(session.remaining, validTotal));
+      const elapsed = Math.max(0, validTotal - validRemaining);
+      const looksFresh = validRemaining < validTotal || session.isBreak || (session.plan || '').trim();
+
+      if (!looksFresh) return;
+
+      isRunning = false;
+      isBreak = Boolean(session.isBreak);
+      isLongBreak = Boolean(session.isLongBreak);
+      remaining = validRemaining;
+      totalForPhase = validTotal;
+      phaseStartedAt = session.phaseStartedAt || (elapsed ? Date.now() - elapsed * 1000 : null);
+      planInput.value = session.plan || '';
+      localStorage.setItem(PLAN_KEY, planInput.value);
+      restoredSession = true;
+      resumeNote.textContent = `已恢复上次未完成的${isBreak ? '休息' : '番茄钟'}，点击“开始”继续。`;
+      resumeNote.classList.add('show');
+    }
+
+    function playBeep() {
+      const AudioContext = window.AudioContext || window.webkitAudioContext;
+      if (!AudioContext) return;
+
+      const ctx = new AudioContext();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.value = isBreak ? 660 : 880;
+      gain.gain.value = 0.16;
+      osc.connect(gain).connect(ctx.destination);
+      osc.start();
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.45);
+      setTimeout(() => { osc.stop(); ctx.close(); }, 500);
+    }
+
+    function getTodayLogs(logs = loadLogs()) {
+      const key = todayKey();
+      return logs.filter((log) => log.day === key || todayKey(new Date(log.time)) === key);
+    }
+
+    function getWeekMinutes(logs = loadLogs()) {
+      const now = new Date();
+      const start = new Date(now);
+      const day = (now.getDay() + 6) % 7;
+      start.setDate(now.getDate() - day);
+      start.setHours(0, 0, 0, 0);
+
+      return logs
+        .filter((log) => new Date(log.time) >= start)
+        .reduce((sum, log) => sum + (log.minutes || settings.work), 0);
+    }
+
+    function updateStats() {
+      const logs = loadLogs();
+      const todayLogs = getTodayLogs(logs);
+      const todayMinutes = todayLogs.reduce((sum, log) => sum + (log.minutes || settings.work), 0);
+      const weekMinutes = getWeekMinutes(logs);
+      statsText.textContent = `今日完成 ${todayLogs.length} 轮 · ${todayMinutes} 分钟｜本周 ${weekMinutes} 分钟`;
+
+      todayRoundsText.textContent = todayLogs.length;
+      todayMinutesText.textContent = todayMinutes;
+
+      todayList.replaceChildren();
+      emptyToday.style.display = todayLogs.length ? 'none' : 'block';
+
+      todayLogs.slice().reverse().forEach((log) => {
+        const li = document.createElement('li');
+        const time = document.createElement('time');
+        const task = document.createElement('span');
+        const start = getLogStart(log);
+
+        time.textContent = `${formatClock(start)}-${formatClock(log.time)}`;
+        task.className = 'task';
+        task.textContent = log.plan || '未填写计划';
+
+        li.append(time, task);
+        todayList.append(li);
+      });
+    }
+
+    function phaseName() {
+      if (!isBreak) return '专注中';
+      return isLongBreak ? '长休息' : '休息中';
+    }
+
     function updateUI() {
-      timeText.textContent = format(remaining);
-      modeText.textContent = isBreak ? '休息中' : '专注中';
       const plan = planInput.value.trim();
-      document.title = `${format(remaining)} · ${isBreak ? '休息' : '专注'}${plan ? '｜' + plan : ''}`;
+      timeText.textContent = format(remaining);
+      modeText.textContent = phaseName();
       startBtn.textContent = isRunning ? '暂停' : '开始';
-      document.documentElement.style.setProperty(
-        '--primary',
-        isBreak ? 'var(--break)' : '#22c55e'
-      );
+      skipRow.classList.toggle('show', isBreak);
+
+      const progress = totalForPhase > 0 ? 100 - (remaining / totalForPhase) * 100 : 0;
+      progressBar.style.width = `${Math.max(0, Math.min(100, progress))}%`;
+
+      document.documentElement.style.setProperty('--primary', isBreak ? 'var(--break)' : '#22c55e');
+      document.title = `${format(remaining)} · ${isBreak ? (isLongBreak ? '长休息' : '休息') : '专注'}${plan ? '｜' + plan : ''}`;
+      saveSession();
+    }
+
+    function syncRemainingFromClock() {
+      if (!isRunning) return;
+      remaining = Math.max(0, Math.ceil((endAt - Date.now()) / 1000));
+    }
+
+    function startTimer() {
+      if (isRunning) return;
+      restoredSession = false;
+      resumeNote.classList.remove('show');
+      if (!phaseStartedAt) phaseStartedAt = Date.now();
+      endAt = Date.now() + remaining * 1000;
+      timer = setInterval(tick, 250);
+      isRunning = true;
+      updateUI();
+    }
+
+    function pauseTimer() {
+      if (!isRunning) return;
+      syncRemainingFromClock();
+      clearInterval(timer);
+      timer = null;
+      isRunning = false;
+      updateUI();
+    }
+
+    function setPhase(nextIsBreak, seconds, longBreak = false) {
+      clearInterval(timer);
+      timer = null;
+      isRunning = false;
+      isBreak = nextIsBreak;
+      isLongBreak = longBreak;
+      remaining = seconds;
+      totalForPhase = seconds;
+      phaseStartedAt = null;
+      restoredSession = false;
+      resumeNote.classList.remove('show');
+      updateUI();
+    }
+
+    function finishPhase() {
+      playBeep();
+
+      if (!isBreak) {
+        const finishedAt = new Date();
+        const startedAt = phaseStartedAt ? new Date(phaseStartedAt) : new Date(finishedAt.getTime() - settings.work * 60 * 1000);
+
+        saveLog({
+          startTime: startedAt.toISOString(),
+          time: finishedAt.toISOString(),
+          day: todayKey(finishedAt),
+          plan: planInput.value.trim(),
+          minutes: settings.work
+        });
+        localStorage.removeItem(PLAN_KEY);
+        planInput.value = '';
+        updateStats();
+
+        const todayRounds = getTodayLogs().length;
+        const shouldLongBreak = todayRounds > 0 && todayRounds % settings.longBreakEvery === 0;
+        setPhase(true, (shouldLongBreak ? settings.longBreak : settings.shortBreak) * 60, shouldLongBreak);
+      } else {
+        setPhase(false, settings.work * 60, false);
+      }
     }
 
     function tick() {
-      if (remaining > 0) {
-        remaining--;
-        updateUI();
-      } else {
-        playBeep();
-        // 完成一轮专注才记 log
-        if (!isBreak) {
-          saveLog({
-            time: new Date().toISOString(),
-            plan: planInput.value.trim()
-          });
-          updateStats();
-        }
-        isBreak = !isBreak;
-        remaining = isBreak ? BREAK_TIME : WORK_TIME;
-        updateUI();
+      syncRemainingFromClock();
+      if (remaining <= 0) {
+        finishPhase();
+        return;
       }
+      updateUI();
     }
 
-    startBtn.addEventListener('click', () => {
-      if (!isRunning) {
-        timer = setInterval(tick, 1000);
-        isRunning = true;
-      } else {
-        clearInterval(timer);
-        isRunning = false;
-      }
+    function resetTimer() {
+      setPhase(false, settings.work * 60, false);
+      clearSession();
+      localStorage.removeItem(PLAN_KEY);
+      planInput.value = '';
       updateUI();
-    });
+    }
 
-    resetBtn.addEventListener('click', () => {
-      clearInterval(timer);
-      isRunning = false;
-      isBreak = false;
-      remaining = WORK_TIME;
-      updateUI();
-    });
+    function fillSettingsInputs() {
+      workInput.value = settings.work;
+      shortBreakInput.value = settings.shortBreak;
+      longBreakInput.value = settings.longBreak;
+      longBreakEveryInput.value = settings.longBreakEvery;
+    }
 
-    // 双击导出 TXT
-    document.querySelector('footer').addEventListener('dblclick', () => {
+    function readNumber(input, fallback) {
+      const value = Number(input.value);
+      const min = Number(input.min || 1);
+      const max = Number(input.max || 999);
+      if (!Number.isFinite(value)) return fallback;
+      return Math.max(min, Math.min(max, Math.round(value)));
+    }
+
+    function applySettings() {
+      settings = {
+        work: readNumber(workInput, DEFAULT_SETTINGS.work),
+        shortBreak: readNumber(shortBreakInput, DEFAULT_SETTINGS.shortBreak),
+        longBreak: readNumber(longBreakInput, DEFAULT_SETTINGS.longBreak),
+        longBreakEvery: readNumber(longBreakEveryInput, DEFAULT_SETTINGS.longBreakEvery)
+      };
+      saveSettings();
+      fillSettingsInputs();
+      if (!isRunning && !isBreak && !restoredSession) resetTimer();
+      updateStats();
+      saveSession();
+    }
+
+    function exportLogs() {
       const logs = loadLogs();
-      let text = 'Pomodoro Log\n\n';
-      logs.forEach(l => {
-        text += `[${new Date(l.time).toLocaleString()}] ${l.plan || '未填写计划'}\n`;
+      const lines = ['Pomodoro Log', ''];
+      logs.forEach((log) => {
+        const start = formatClock(getLogStart(log));
+        const end = formatClock(log.time);
+        const minutes = log.minutes || settings.work;
+        lines.push(`[${todayKey(new Date(log.time))} ${start}-${end}] ${minutes} 分钟 - ${log.plan || '未填写计划'}`);
       });
-      const blob = new Blob([text], { type: 'text/plain' });
+
+      const blob = new Blob([lines.join('\n')], { type: 'text/plain;charset=utf-8' });
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
-      a.download = 'pomodoro_log.txt';
+      a.download = `pomodoro_log_${todayKey()}.txt`;
       a.click();
       URL.revokeObjectURL(a.href);
+    }
+
+    startBtn.addEventListener('click', () => isRunning ? pauseTimer() : startTimer());
+    resetBtn.addEventListener('click', resetTimer);
+    skipBtn.addEventListener('click', () => setPhase(false, settings.work * 60, false));
+    exportBtn.addEventListener('click', exportLogs);
+
+    clearBtn.addEventListener('click', () => {
+      if (!confirm('确定清空所有番茄钟记录吗？这个操作不能撤销。')) return;
+      saveLogs([]);
+      updateStats();
+    });
+
+    [workInput, shortBreakInput, longBreakInput, longBreakEveryInput].forEach((input) => {
+      input.addEventListener('change', applySettings);
+    });
+
+    planInput.addEventListener('input', () => {
+      localStorage.setItem(PLAN_KEY, planInput.value);
+      updateUI();
+    });
+
+    document.addEventListener('visibilitychange', () => {
+      syncRemainingFromClock();
+      updateUI();
+      if (isRunning && remaining <= 0) finishPhase();
+    });
+
+    window.addEventListener('beforeunload', (event) => {
+      syncRemainingFromClock();
+      saveSession();
+      if (!isRunning) return;
+      event.preventDefault();
+      event.returnValue = '';
     });
 
     // 初始化
-    updateUI();
+    planInput.value = localStorage.getItem(PLAN_KEY) || '';
+    fillSettingsInputs();
+    restoreSession();
     updateStats();
+    updateUI();
   </script>
 </body>
 </html>
