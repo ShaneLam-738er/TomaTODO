@@ -363,6 +363,80 @@
  gap: 10px;
  margin-top: 14px;
  }
+
+ .sync-panel {
+ margin-top: 14px;
+ padding-top: 14px;
+ border-top: 1px solid rgba(148, 163, 184, 0.14);
+ }
+ .sync-title {
+ margin: 0 0 10px;
+ color: var(--text);
+ font-size: 13px;
+ font-weight: 700;
+ text-align: center;
+ }
+ .sync-grid {
+ display: grid;
+ grid-template-columns: 1fr;
+ gap: 9px;
+ }
+ .sync-grid label {
+ display: grid;
+ gap: 6px;
+ }
+ .sync-grid input {
+ padding: 9px 10px;
+ border-radius: 10px;
+ font-size: 13px;
+ }
+ .sync-advanced {
+ margin-top: 10px;
+ font-size: 12px;
+ }
+ .sync-advanced summary {
+ color: var(--muted);
+ }
+ .sync-remember {
+ display: flex;
+ align-items: center;
+ gap: 8px;
+ margin-top: 10px;
+ line-height: 1.4;
+ }
+ .sync-remember input {
+ width: auto;
+ accent-color: var(--primary);
+ }
+ .sync-actions {
+ display: grid;
+ grid-template-columns: 1fr 1fr;
+ gap: 10px;
+ margin-top: 12px;
+ }
+ .sync-actions button {
+ padding: 10px 12px;
+ }
+ .sync-status {
+ min-height: 18px;
+ margin: 10px 0 0;
+ color: var(--muted);
+ font-size: 12px;
+ line-height: 1.5;
+ text-align: center;
+ word-break: break-word;
+ }
+ .sync-status.ok { color: #bbf7d0; }
+ .sync-status.warn { color: #fde68a; }
+ .sync-status.error { color: #fecaca; }
+ .sync-help {
+ margin: 8px 0 0;
+ color: var(--muted);
+ font-size: 11px;
+ line-height: 1.55;
+ text-align: left;
+ }
+
  @media (max-width: 760px) {
  body { align-items: flex-start; }
  .today-rail {
@@ -415,6 +489,53 @@
  <button id="exportBtn" class="ghost">导出 TXT</button>
  <button id="clearBtn" class="ghost">清空记录</button>
  </div>
+ <section class="sync-panel" aria-label="GitHub 加密同步">
+ <p class="sync-title">GitHub 加密同步</p>
+ <div class="sync-grid">
+ <label>同步用户名
+ <input id="syncUsernameInput" type="text" maxlength="64" placeholder="例如 shane" autocomplete="username" />
+ </label>
+ <label>同步密码
+ <input id="syncPasswordInput" type="password" placeholder="用于加密/解密同步文件" autocomplete="current-password" />
+ </label>
+ <label>GitHub Token
+ <input id="githubTokenInput" type="password" placeholder="第一次在每台设备输入一次" autocomplete="off" />
+ </label>
+ </div>
+ <details class="sync-advanced">
+ <summary>同步仓库设置</summary>
+ <div class="settings">
+ <label>Owner
+ <input id="githubOwnerInput" type="text" value="ShaneLam-738er" autocomplete="off" />
+ </label>
+ <label>Repo
+ <input id="githubRepoInput" type="text" value="TomaTODO" autocomplete="off" />
+ </label>
+ <label>Branch
+ <input id="githubBranchInput" type="text" value="main" autocomplete="off" />
+ </label>
+ <label>目录
+ <input id="githubDirInput" type="text" value="users" autocomplete="off" />
+ </label>
+ </div>
+ </details>
+ <label class="sync-remember">
+ <input id="rememberTokenInput" type="checkbox" checked />
+ <span>在这台设备记住 GitHub Token（保存在 localStorage）</span>
+ </label>
+ <label class="sync-remember">
+ <input id="rememberPasswordInput" type="checkbox" />
+ <span>记住同步密码（保存派生解密密钥到 localStorage；公共电脑不要勾选）</span>
+ </label>
+ <div class="sync-actions">
+ <button id="syncLoginBtn" type="button">登录并读取</button>
+ <button id="syncPushBtn" type="button" class="ghost">上传当前</button>
+ <button id="syncPullBtn" type="button" class="ghost">读取云端</button>
+ <button id="syncLogoutBtn" type="button" class="ghost">退出登录</button>
+ </div>
+ <p class="sync-status" id="syncStatusText">未登录。数据会先保存在本机，登录后同步到 GitHub。</p>
+ <p class="sync-help">同步文件会写到当前仓库的 <code>users/用户名.tomatodo.enc</code>。仓库里只保存 AES-GCM 加密后的数据；GitHub Token 和可选记住的解密密钥只保存在这台设备的浏览器 localStorage。</p><p class="sync-help">Token 默认记住，避免每次输入；同步密码只有勾选“记住同步密码”时才会保存派生解密密钥。公共电脑不要勾选。</p>
+ </section>
  </details>
  </main>
  </div>
@@ -451,6 +572,19 @@
  const PLAN_KEY = 'pomodoro_plan_draft';
  const SESSION_KEY = 'pomodoro_current_session';
  const DAILY_PLANS_KEY = 'pomodoro_daily_plans_v1';
+ const SYNC_PROFILE_KEY = 'tomatodo_github_sync_profile';
+ const SYNC_TOKEN_KEY = 'tomatodo_github_token';
+ const SYNC_PASSWORD_KEY = 'tomatodo_github_password_hash';
+ const SYNC_COOKIE_NAME = 'tomatodo_sync_session';
+ const SYNC_SCHEMA_VERSION = 1;
+ const SYNC_REMEMBER_DAYS = 30;
+ const GITHUB_API_VERSION = '2022-11-28';
+ const DEFAULT_SYNC_CONFIG = {
+ owner: 'ShaneLam-738er',
+ repo: 'TomaTODO',
+ branch: 'main',
+ dir: 'users'
+ };
  const DEFAULT_SETTINGS = {
  work: 25,
  shortBreak: 5,
@@ -474,6 +608,11 @@
  let endAt = 0;
  let phaseStartedAt = null;
  let restoredSession = false;
+ let initialized = false;
+ let suppressSync = false;
+ let syncTimer = null;
+ let syncState = null;
+ let lastRemoteSha = null;
  const $ = (id) => document.getElementById(id);
  const timeText = $('timeText');
  const modeText = $('modeText');
@@ -501,6 +640,20 @@
  const addDailyPlanBtn = $('addDailyPlanBtn');
  const dailyPlanList = $('dailyPlanList');
  const emptyPlanText = $('emptyPlanText');
+ const syncUsernameInput = $('syncUsernameInput');
+ const syncPasswordInput = $('syncPasswordInput');
+ const githubTokenInput = $('githubTokenInput');
+ const githubOwnerInput = $('githubOwnerInput');
+ const githubRepoInput = $('githubRepoInput');
+ const githubBranchInput = $('githubBranchInput');
+ const githubDirInput = $('githubDirInput');
+ const rememberTokenInput = $('rememberTokenInput');
+ const rememberPasswordInput = $('rememberPasswordInput');
+ const syncLoginBtn = $('syncLoginBtn');
+ const syncPushBtn = $('syncPushBtn');
+ const syncPullBtn = $('syncPullBtn');
+ const syncLogoutBtn = $('syncLogoutBtn');
+ const syncStatusText = $('syncStatusText');
  function safeJSON(value, fallback) {
  try { return JSON.parse(value) ?? fallback; } catch { return fallback; }
  }
@@ -509,12 +662,14 @@
  }
  function saveSettings() {
  localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+ queueAutoSync('设置已更新');
  }
  function loadLogs() {
  return safeJSON(localStorage.getItem(STORAGE_KEY), []);
  }
  function saveLogs(logs) {
  localStorage.setItem(STORAGE_KEY, JSON.stringify(logs));
+ queueAutoSync('记录已更新');
  }
  function saveLog(entry) {
  const logs = loadLogs();
@@ -549,6 +704,7 @@
  }
  function saveDailyPlans() {
  localStorage.setItem(DAILY_PLANS_KEY, JSON.stringify(dailyPlans));
+ queueAutoSync('计划已更新');
  }
  function rollDailyPlansIfNeeded() {
  const today = todayKey();
@@ -865,6 +1021,385 @@
  updateStats();
  saveSession();
  }
+
+ function setSyncStatus(message, type = '') {
+ syncStatusText.textContent = message;
+ syncStatusText.className = `sync-status${type ? ' ' + type : ''}`;
+ }
+ function setCookie(name, value, days = 30) {
+ const expires = new Date(Date.now() + days * 24 * 60 * 60 * 1000).toUTCString();
+ document.cookie = `${name}=${encodeURIComponent(value)}; expires=${expires}; path=/; SameSite=Lax; Secure`;
+ }
+ function getCookie(name) {
+ const prefix = `${name}=`;
+ return document.cookie.split(';').map((part) => part.trim()).find((part) => part.startsWith(prefix))?.slice(prefix.length) || '';
+ }
+ function deleteCookie(name) {
+ document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/; SameSite=Lax; Secure`;
+ }
+ function safeName(value) {
+ return /^[a-zA-Z0-9_-]{1,64}$/.test(value);
+ }
+ function cleanDir(value) {
+ return (value || 'users').trim().replace(/^\/+|\/+$/g, '') || 'users';
+ }
+ function bytesToBase64(bytes) {
+ let binary = '';
+ const chunkSize = 0x8000;
+ for (let i = 0; i < bytes.length; i += chunkSize) {
+ binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
+ }
+ return btoa(binary);
+ }
+ function base64ToBytes(base64) {
+ const binary = atob((base64 || '').replace(/\s/g, ''));
+ const bytes = new Uint8Array(binary.length);
+ for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
+ return bytes;
+ }
+ function utf8ToBase64(value) {
+ return bytesToBase64(new TextEncoder().encode(value));
+ }
+ function base64ToUtf8(value) {
+ return new TextDecoder().decode(base64ToBytes(value));
+ }
+ function bytesToHex(buffer) {
+ return [...new Uint8Array(buffer)].map((byte) => byte.toString(16).padStart(2, '0')).join('');
+ }
+ function hexToBytes(hex) {
+ const bytes = new Uint8Array(hex.length / 2);
+ for (let i = 0; i < bytes.length; i += 1) bytes[i] = parseInt(hex.slice(i * 2, i * 2 + 2), 16);
+ return bytes;
+ }
+ async function sha256Hex(value) {
+ const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value));
+ return bytesToHex(digest);
+ }
+ async function importSyncKey(passwordHash) {
+ return crypto.subtle.importKey('raw', hexToBytes(passwordHash), { name: 'AES-GCM' }, false, ['encrypt', 'decrypt']);
+ }
+ async function encryptSyncPayload(data, passwordHash) {
+ const iv = crypto.getRandomValues(new Uint8Array(12));
+ const key = await importSyncKey(passwordHash);
+ const plain = JSON.stringify({ version: SYNC_SCHEMA_VERSION, exportedAt: new Date().toISOString(), data });
+ const encrypted = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, new TextEncoder().encode(plain));
+ return JSON.stringify({
+ version: SYNC_SCHEMA_VERSION,
+ algorithm: 'AES-GCM',
+ kdf: 'SHA-256(password)',
+ savedAt: new Date().toISOString(),
+ iv: bytesToBase64(iv),
+ data: bytesToBase64(new Uint8Array(encrypted))
+ });
+ }
+ async function decryptSyncPayload(payload, passwordHash) {
+ const parsed = safeJSON(payload, null);
+ if (!parsed || parsed.algorithm !== 'AES-GCM' || !parsed.iv || !parsed.data) throw new Error('同步文件格式不正确');
+ const key = await importSyncKey(passwordHash);
+ const decrypted = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: base64ToBytes(parsed.iv) }, key, base64ToBytes(parsed.data));
+ const envelope = safeJSON(new TextDecoder().decode(decrypted), null);
+ if (!envelope || !envelope.data) throw new Error('同步文件无法解析');
+ return envelope.data;
+ }
+ function buildSyncPath(username, dir = 'users') {
+ const fileName = `${username}.tomatodo.enc`;
+ return { fileName, path: `${cleanDir(dir)}/${fileName}` };
+ }
+ function getSyncConfigFromInputs() {
+ return {
+ owner: githubOwnerInput.value.trim() || DEFAULT_SYNC_CONFIG.owner,
+ repo: githubRepoInput.value.trim() || DEFAULT_SYNC_CONFIG.repo,
+ branch: githubBranchInput.value.trim() || DEFAULT_SYNC_CONFIG.branch,
+ dir: cleanDir(githubDirInput.value || DEFAULT_SYNC_CONFIG.dir)
+ };
+ }
+ function fillSyncInputs(profile = {}) {
+ syncUsernameInput.value = profile.username || syncUsernameInput.value || '';
+ githubOwnerInput.value = profile.owner || DEFAULT_SYNC_CONFIG.owner;
+ githubRepoInput.value = profile.repo || DEFAULT_SYNC_CONFIG.repo;
+ githubBranchInput.value = profile.branch || DEFAULT_SYNC_CONFIG.branch;
+ githubDirInput.value = profile.dir || DEFAULT_SYNC_CONFIG.dir;
+ if (loadSavedToken()) githubTokenInput.placeholder = '已保存，留空继续使用';
+ if (loadSavedPasswordHash()) syncPasswordInput.placeholder = '已记住，留空继续使用';
+ rememberTokenInput.checked = rememberTokenInput.checked || Boolean(loadSavedToken());
+ rememberPasswordInput.checked = Boolean(loadSavedPasswordHash());
+ }
+ function rememberExpiry() {
+ return Date.now() + SYNC_REMEMBER_DAYS * 24 * 60 * 60 * 1000;
+ }
+ function isExpired(saved) {
+ return !saved?.expiresAt || Date.now() > saved.expiresAt;
+ }
+ function saveSyncProfile(profile, token, passwordHash) {
+ const profileToStore = {
+ username: profile.username,
+ owner: profile.owner,
+ repo: profile.repo,
+ branch: profile.branch,
+ dir: profile.dir,
+ savedAt: Date.now()
+ };
+ localStorage.setItem(SYNC_PROFILE_KEY, JSON.stringify(profileToStore));
+ if (rememberTokenInput.checked) {
+ if (token) localStorage.setItem(SYNC_TOKEN_KEY, JSON.stringify({ token, savedAt: Date.now() }));
+ } else {
+ localStorage.removeItem(SYNC_TOKEN_KEY);
+ }
+ if (rememberPasswordInput.checked) {
+ if (passwordHash) localStorage.setItem(SYNC_PASSWORD_KEY, JSON.stringify({ passwordHash, savedAt: Date.now() }));
+ } else {
+ localStorage.removeItem(SYNC_PASSWORD_KEY);
+ }
+ deleteCookie(SYNC_COOKIE_NAME);
+ }
+ function loadSavedSyncProfile() {
+ const fromLocal = safeJSON(localStorage.getItem(SYNC_PROFILE_KEY), null);
+ if (!fromLocal?.username) return null;
+ if (fromLocal.expiresAt && isExpired(fromLocal)) {
+ clearSavedSyncProfile();
+ return null;
+ }
+ return {
+ username: fromLocal.username,
+ owner: fromLocal.owner || DEFAULT_SYNC_CONFIG.owner,
+ repo: fromLocal.repo || DEFAULT_SYNC_CONFIG.repo,
+ branch: fromLocal.branch || DEFAULT_SYNC_CONFIG.branch,
+ dir: fromLocal.dir || DEFAULT_SYNC_CONFIG.dir
+ };
+ }
+ function loadSavedToken() {
+ const raw = localStorage.getItem(SYNC_TOKEN_KEY);
+ if (!raw) return '';
+ const wrapped = safeJSON(raw, null);
+ if (!wrapped) return raw;
+ return wrapped.token || '';
+ }
+ function loadSavedPasswordHash() {
+ const raw = localStorage.getItem(SYNC_PASSWORD_KEY);
+ if (raw) {
+ const wrapped = safeJSON(raw, null);
+ if (!wrapped) return raw;
+ return wrapped.passwordHash || '';
+ }
+ const legacyProfile = safeJSON(localStorage.getItem(SYNC_PROFILE_KEY), null);
+ if (legacyProfile?.passwordHash && !(legacyProfile.expiresAt && isExpired(legacyProfile))) return legacyProfile.passwordHash;
+ return '';
+ }
+ function clearSavedSyncProfile() {
+ localStorage.removeItem(SYNC_PROFILE_KEY);
+ localStorage.removeItem(SYNC_TOKEN_KEY);
+ localStorage.removeItem(SYNC_PASSWORD_KEY);
+ deleteCookie(SYNC_COOKIE_NAME);
+ }
+ function restoreSavedSyncLogin() {
+ const saved = loadSavedSyncProfile();
+ fillSyncInputs(saved || DEFAULT_SYNC_CONFIG);
+ const savedToken = loadSavedToken();
+ const savedPasswordHash = loadSavedPasswordHash();
+ if (!saved) return;
+ const { fileName, path } = buildSyncPath(saved.username, saved.dir);
+ syncState = { ...saved, token: savedToken, passwordHash: savedPasswordHash, fileName, path };
+ if (savedToken && savedPasswordHash) {
+ setSyncStatus(`已从本机恢复登录：${saved.username}｜${path}，可直接同步。`, 'ok');
+ } else if (savedToken) {
+ setSyncStatus(`已从本机恢复 Token 和配置：${saved.username}｜${path}。读取或上传加密数据时请输入同步密码。`, 'warn');
+ } else {
+ setSyncStatus(`已从本机恢复配置：${saved.username}｜${path}。同步前请输入 GitHub Token${savedPasswordHash ? '' : ' 和同步密码'}。`, 'warn');
+ }
+ }
+ function collectSyncData() {
+ syncRemainingFromClock();
+ saveSession();
+ return {
+ schemaVersion: SYNC_SCHEMA_VERSION,
+ savedAt: new Date().toISOString(),
+ logs: loadLogs(),
+ settings,
+ planDraft: planInput.value,
+ currentSession: safeJSON(localStorage.getItem(SESSION_KEY), null),
+ dailyPlans
+ };
+ }
+ function applySyncData(data) {
+ suppressSync = true;
+ try {
+ clearInterval(timer);
+ timer = null;
+ isRunning = false;
+ settings = { ...DEFAULT_SETTINGS, ...(data.settings || {}) };
+ dailyPlans = normalizePlans(data.dailyPlans || DEFAULT_DAILY_PLANS());
+ saveLogs(Array.isArray(data.logs) ? data.logs : []);
+ saveSettings();
+ saveDailyPlans();
+ if (data.planDraft) localStorage.setItem(PLAN_KEY, data.planDraft);
+ else localStorage.removeItem(PLAN_KEY);
+ if (data.currentSession) localStorage.setItem(SESSION_KEY, JSON.stringify(data.currentSession));
+ else localStorage.removeItem(SESSION_KEY);
+ planInput.value = localStorage.getItem(PLAN_KEY) || '';
+ isBreak = false;
+ isLongBreak = false;
+ remaining = settings.work * 60;
+ totalForPhase = remaining;
+ phaseStartedAt = null;
+ restoredSession = false;
+ fillSettingsInputs();
+ restoreSession();
+ rollDailyPlansIfNeeded();
+ updateStats();
+ renderDailyPlans();
+ updateUI();
+ } finally {
+ suppressSync = false;
+ }
+ }
+ function isSyncReady() {
+ return Boolean(syncState?.username && syncState?.passwordHash && syncState?.owner && syncState?.repo && syncState?.branch && syncState?.path);
+ }
+ function queueAutoSync(reason = '数据已更新') {
+ if (suppressSync || !initialized || !isSyncReady() || !syncState.token) return;
+ clearTimeout(syncTimer);
+ setSyncStatus(`${reason}，稍后自动上传...`, 'warn');
+ syncTimer = setTimeout(() => {
+ pushSyncToGitHub('自动同步').catch((error) => setSyncStatus(`自动同步失败：${error.message}`, 'error'));
+ }, 5000);
+ }
+ function githubHeaders(token) {
+ const headers = {
+ Accept: 'application/vnd.github+json',
+ 'X-GitHub-Api-Version': GITHUB_API_VERSION
+ };
+ if (token) headers.Authorization = `Bearer ${token}`;
+ return headers;
+ }
+ function githubContentUrl() {
+ const path = syncState.path.split('/').map(encodeURIComponent).join('/');
+ return `https://api.github.com/repos/${encodeURIComponent(syncState.owner)}/${encodeURIComponent(syncState.repo)}/contents/${path}`;
+ }
+ async function readRemoteFile() {
+ if (!isSyncReady()) throw new Error('请先登录同步账号');
+ const url = `${githubContentUrl()}?ref=${encodeURIComponent(syncState.branch)}`;
+ const response = await fetch(url, { headers: githubHeaders(syncState.token) });
+ if (response.status === 404) return null;
+ if (!response.ok) throw new Error(`GitHub 读取失败：${response.status}`);
+ const json = await response.json();
+ lastRemoteSha = json.sha || null;
+ return { sha: json.sha, text: base64ToUtf8(json.content || '') };
+ }
+ async function writeRemoteFile(payload, label = '同步') {
+ if (!isSyncReady()) throw new Error('请先登录同步账号');
+ if (!syncState.token) throw new Error('写入 GitHub 需要 Token');
+ let sha = lastRemoteSha;
+ if (!sha) {
+ const current = await readRemoteFile();
+ sha = current?.sha || null;
+ }
+ const body = {
+ message: `${label} TomaTODO data`,
+ content: utf8ToBase64(payload),
+ branch: syncState.branch
+ };
+ if (sha) body.sha = sha;
+ let response = await fetch(githubContentUrl(), {
+ method: 'PUT',
+ headers: { ...githubHeaders(syncState.token), 'Content-Type': 'application/json' },
+ body: JSON.stringify(body)
+ });
+ if (response.status === 409) {
+ const current = await readRemoteFile();
+ if (current?.sha) {
+ body.sha = current.sha;
+ response = await fetch(githubContentUrl(), {
+ method: 'PUT',
+ headers: { ...githubHeaders(syncState.token), 'Content-Type': 'application/json' },
+ body: JSON.stringify(body)
+ });
+ }
+ }
+ if (!response.ok) {
+ const detail = await response.text().catch(() => '');
+ throw new Error(`GitHub 写入失败：${response.status}${detail ? '｜' + detail.slice(0, 120) : ''}`);
+ }
+ const json = await response.json();
+ lastRemoteSha = json.content?.sha || null;
+ return json;
+ }
+ async function pullSyncFromGitHub({ apply = true, quietNotFound = false } = {}) {
+ setSyncStatus('正在读取 GitHub 云端数据...', 'warn');
+ const remote = await readRemoteFile();
+ if (!remote) {
+ if (!quietNotFound) setSyncStatus('云端还没有同步文件，将上传当前本机数据作为初始版本。', 'warn');
+ return null;
+ }
+ const data = await decryptSyncPayload(remote.text, syncState.passwordHash);
+ if (apply) applySyncData(data);
+ setSyncStatus(`已读取并应用云端数据：${syncState.path}`, 'ok');
+ return data;
+ }
+ async function pushSyncToGitHub(label = '手动同步') {
+ clearTimeout(syncTimer);
+ setSyncStatus('正在加密并上传到 GitHub...', 'warn');
+ const payload = await encryptSyncPayload(collectSyncData(), syncState.passwordHash);
+ await writeRemoteFile(payload, label);
+ setSyncStatus(`已上传：${syncState.path}`, 'ok');
+ }
+ async function prepareSyncState() {
+ const username = syncUsernameInput.value.trim();
+ if (!safeName(username)) throw new Error('用户名只能用英文、数字、下划线或短横线，长度 1-64');
+ const config = getSyncConfigFromInputs();
+ const token = githubTokenInput.value.trim() || loadSavedToken() || syncState?.token || '';
+ const password = syncPasswordInput.value;
+ const passwordHash = password ? await sha256Hex(password) : loadSavedPasswordHash() || syncState?.passwordHash;
+ if (!token) throw new Error('请输入 GitHub Token，或使用已保存在本机的 Token');
+ if (!passwordHash) throw new Error('请输入同步密码；勾选“记住同步密码”后，下次可留空');
+ const { fileName, path } = buildSyncPath(username, config.dir);
+ syncState = { username, passwordHash, token, fileName, path, ...config };
+ lastRemoteSha = null;
+ saveSyncProfile(syncState, token, passwordHash);
+ if (rememberTokenInput.checked) githubTokenInput.placeholder = '已保存，留空继续使用';
+ if (rememberPasswordInput.checked) syncPasswordInput.placeholder = '已记住，留空继续使用';
+ return syncState;
+ }
+ async function handleSyncLogin() {
+ try {
+ await prepareSyncState();
+ setSyncStatus(`已登录：${syncState.username}，正在检查云端文件...`, 'warn');
+ const remoteData = await pullSyncFromGitHub({ apply: true, quietNotFound: true });
+ if (!remoteData) await pushSyncToGitHub('init sync');
+ } catch (error) {
+ setSyncStatus(error.message, 'error');
+ }
+ }
+ async function handleManualPull() {
+ try {
+ await prepareSyncState();
+ const hasLocalData = loadLogs().length || planInput.value.trim() || dailyPlans.today.length || dailyPlans.tomorrow.length;
+ if (hasLocalData && !confirm('读取云端数据会覆盖本机当前数据，确定继续吗？')) return;
+ await pullSyncFromGitHub({ apply: true });
+ } catch (error) {
+ setSyncStatus(error.message, 'error');
+ }
+ }
+ async function handleManualPush() {
+ try {
+ await prepareSyncState();
+ await pushSyncToGitHub('manual sync');
+ } catch (error) {
+ setSyncStatus(error.message, 'error');
+ }
+ }
+ function handleSyncLogout() {
+ clearTimeout(syncTimer);
+ syncState = null;
+ lastRemoteSha = null;
+ clearSavedSyncProfile();
+ syncPasswordInput.value = '';
+ githubTokenInput.value = '';
+ githubTokenInput.placeholder = '第一次在每台设备输入一次';
+ syncPasswordInput.placeholder = '用于加密/解密同步文件';
+ rememberPasswordInput.checked = false;
+ setSyncStatus('已退出同步登录。本机数据仍保留在当前浏览器。', 'warn');
+ }
+
  function exportLogs() {
  const logs = loadLogs();
  const lines = ['Pomodoro Log', ''];
@@ -890,12 +1425,17 @@
  saveLogs([]);
  updateStats();
  });
+ syncLoginBtn.addEventListener('click', handleSyncLogin);
+ syncPullBtn.addEventListener('click', handleManualPull);
+ syncPushBtn.addEventListener('click', handleManualPush);
+ syncLogoutBtn.addEventListener('click', handleSyncLogout);
  [workInput, shortBreakInput, longBreakInput, longBreakEveryInput].forEach((input) => {
  input.addEventListener('change', applySettings);
  });
  planInput.addEventListener('input', () => {
  localStorage.setItem(PLAN_KEY, planInput.value);
  updateUI();
+ queueAutoSync('本次计划已更新');
  });
  planSwitchBtn.addEventListener('click', () => {
  rollDailyPlansIfNeeded();
@@ -930,7 +1470,9 @@
  restoreSession();
  updateStats();
  renderDailyPlans();
+ restoreSavedSyncLogin();
  updateUI();
+ initialized = true;
  setInterval(() => {
  if (rollDailyPlansIfNeeded()) renderDailyPlans();
  }, 60 * 1000);
