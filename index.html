@@ -282,6 +282,22 @@
  gap: 6px;
  padding: 6px 0;
  border-top: 1px solid rgba(148, 163, 184, 0.1);
+ transition: opacity 0.18s ease, background-color 0.22s ease;
+ will-change: transform;
+ }
+ .daily-plan-item.just-completed {
+ animation: planCompletePulse 0.46s ease;
+ }
+ @keyframes planCompletePulse {
+ 0% { background: rgba(34, 197, 94, 0); }
+ 34% { background: rgba(34, 197, 94, 0.16); }
+ 100% { background: rgba(34, 197, 94, 0); }
+ }
+ @media (prefers-reduced-motion: reduce) {
+ .daily-plan-item, .daily-plan-item.just-completed {
+ transition: none;
+ animation: none;
+ }
  }
  .daily-plan-item:first-child { border-top: 0; }
  .daily-plan-text {
@@ -303,7 +319,9 @@
  border-radius: 999px;
  border: 1px solid rgba(148, 163, 184, 0.48);
  background: transparent;
+ transition: background 0.18s ease, border-color 0.18s ease, transform 0.18s ease;
  }
+ .done-dot:hover { transform: scale(1.08); }
  .daily-plan-item.done .done-dot {
  border-color: rgba(34, 197, 94, 0.72);
  background: rgba(34, 197, 94, 0.82);
@@ -691,12 +709,27 @@
  completedAt: null
  };
  }
+ function normalizePlanItem(item) {
+ return {
+ id: item?.id || `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+ text: String(item?.text || '').trim(),
+ done: Boolean(item?.done),
+ createdAt: item?.createdAt || new Date().toISOString(),
+ completedAt: item?.completedAt || null
+ };
+ }
+ function orderPlans(items) {
+ const unfinished = [];
+ const finished = [];
+ items.forEach((item) => (item.done ? finished : unfinished).push(item));
+ return [...unfinished, ...finished];
+ }
  function normalizePlans(value) {
  const base = { ...DEFAULT_DAILY_PLANS(), ...(value || {}) };
  base.today = Array.isArray(base.today) ? base.today : [];
  base.tomorrow = Array.isArray(base.tomorrow) ? base.tomorrow : [];
- base.today = base.today.map((item) => ({ completedAt: null, ...item }));
- base.tomorrow = base.tomorrow.map((item) => ({ completedAt: null, ...item }));
+ base.today = orderPlans(base.today.map(normalizePlanItem).filter((item) => item.text));
+ base.tomorrow = orderPlans(base.tomorrow.map(normalizePlanItem).filter((item) => item.text));
  return base;
  }
  function loadDailyPlans() {
@@ -706,12 +739,44 @@
  localStorage.setItem(DAILY_PLANS_KEY, JSON.stringify(dailyPlans));
  queueAutoSync('计划已更新');
  }
+ function makeDailyPlanLog(item, sourceDate, sourceBucket) {
+ const completedAt = item.completedAt || new Date().toISOString();
+ return {
+ type: 'daily-plan',
+ planId: item.id,
+ time: completedAt,
+ day: todayKey(new Date(completedAt)),
+ plan: item.text,
+ minutes: 0,
+ completedAt,
+ sourceDate,
+ sourceBucket
+ };
+ }
+ function archiveCompletedPlans(items, sourceDate, sourceBucket) {
+ const doneItems = items.filter((item) => item.done);
+ if (!doneItems.length) return;
+ const logs = loadLogs();
+ const archivedIds = new Set(logs.filter((log) => log.type === 'daily-plan' && log.planId).map((log) => log.planId));
+ doneItems.forEach((item) => {
+ if (!archivedIds.has(item.id)) logs.push(makeDailyPlanLog(item, sourceDate, sourceBucket));
+ });
+ saveLogs(logs);
+ }
  function rollDailyPlansIfNeeded() {
  const today = todayKey();
  if (dailyPlans.date === today) return false;
+ const sourceDate = dailyPlans.date || today;
+ const oldToday = dailyPlans.today || [];
+ const oldTomorrow = dailyPlans.tomorrow || [];
+ archiveCompletedPlans(oldToday, sourceDate, 'today');
+ archiveCompletedPlans(oldTomorrow, sourceDate, 'tomorrow');
  dailyPlans = normalizePlans({
  date: today,
- today: [...dailyPlans.today, ...dailyPlans.tomorrow],
+ today: [
+ ...oldToday.filter((item) => !item.done),
+ ...oldTomorrow.filter((item) => !item.done)
+ ],
  tomorrow: []
  });
  saveDailyPlans();
@@ -723,6 +788,34 @@
  function setVisiblePlans(items) {
  if (planView === 'today') dailyPlans.today = items;
  else dailyPlans.tomorrow = items;
+ }
+ function getPlanPositions() {
+ const positions = new Map();
+ dailyPlanList.querySelectorAll('[data-plan-id]').forEach((element) => {
+ positions.set(element.dataset.planId, element.getBoundingClientRect());
+ });
+ return positions;
+ }
+ function animatePlanReorder(previousPositions, highlightId = '') {
+ if (!previousPositions?.size || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+ requestAnimationFrame(() => {
+ dailyPlanList.querySelectorAll('[data-plan-id]').forEach((element) => {
+ const previous = previousPositions.get(element.dataset.planId);
+ if (!previous) return;
+ const current = element.getBoundingClientRect();
+ const deltaY = previous.top - current.top;
+ if (Math.abs(deltaY) < 1) return;
+ element.animate([
+ { transform: `translateY(${deltaY}px)` },
+ { transform: 'translateY(0)' }
+ ], { duration: 240, easing: 'cubic-bezier(0.2, 0.8, 0.2, 1)' });
+ });
+ const highlighted = highlightId ? dailyPlanList.querySelector(`[data-plan-id="${CSS.escape(highlightId)}"]`) : null;
+ if (highlighted) {
+ highlighted.classList.add('just-completed');
+ highlighted.addEventListener('animationend', () => highlighted.classList.remove('just-completed'), { once: true });
+ }
+ });
  }
  function renderDailyPlans() {
  rollDailyPlansIfNeeded();
@@ -739,6 +832,7 @@
  const doneBtn = document.createElement('button');
  const deleteBtn = document.createElement('button');
  li.className = `daily-plan-item${item.done ? ' done' : ''}`;
+ li.dataset.planId = item.id;
  text.className = 'daily-plan-text';
  text.textContent = item.text;
  doneBtn.className = 'done-dot';
@@ -761,7 +855,10 @@
  const text = dailyPlanInput.value.trim();
  if (!text) return;
  const list = getVisiblePlans();
- list.push(makePlan(text));
+ const firstDoneIndex = list.findIndex((item) => item.done);
+ const plan = makePlan(text);
+ if (firstDoneIndex === -1) list.push(plan);
+ else list.splice(firstDoneIndex, 0, plan);
  setVisiblePlans(list);
  dailyPlanInput.value = '';
  saveDailyPlans();
@@ -774,14 +871,30 @@
  }
  return null;
  }
+ function movePlanAfterStatusChange(bucket, id) {
+ const list = dailyPlans[bucket];
+ const index = list.findIndex((item) => item.id === id);
+ if (index === -1) return;
+ const [item] = list.splice(index, 1);
+ if (item.done) {
+ list.push(item);
+ return;
+ }
+ const firstDoneIndex = list.findIndex((plan) => plan.done);
+ if (firstDoneIndex === -1) list.push(item);
+ else list.splice(firstDoneIndex, 0, item);
+ }
  function togglePlanDone(id) {
  rollDailyPlansIfNeeded();
+ const previousPositions = getPlanPositions();
  const match = findPlanById(id);
  if (!match) return;
  match.item.done = !match.item.done;
  match.item.completedAt = match.item.done ? new Date().toISOString() : null;
+ movePlanAfterStatusChange(match.bucket, id);
  saveDailyPlans();
  renderDailyPlans();
+ if (match.bucket === planView) animatePlanReorder(previousPositions, id);
  }
  function deletePlan(id) {
  rollDailyPlansIfNeeded();
@@ -871,9 +984,12 @@
  gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.45);
  setTimeout(() => { osc.stop(); ctx.close(); }, 500);
  }
+ function getPomodoroLogs(logs = loadLogs()) {
+ return logs.filter((log) => (log.type || 'pomodoro') === 'pomodoro');
+ }
  function getTodayLogs(logs = loadLogs()) {
  const key = todayKey();
- return logs.filter((log) => log.day === key || todayKey(new Date(log.time)) === key);
+ return getPomodoroLogs(logs).filter((log) => log.day === key || todayKey(new Date(log.time)) === key);
  }
  function getWeekMinutes(logs = loadLogs()) {
  const now = new Date();
@@ -881,7 +997,7 @@
  const day = (now.getDay() + 6) % 7;
  start.setDate(now.getDate() - day);
  start.setHours(0, 0, 0, 0);
- return logs
+ return getPomodoroLogs(logs)
  .filter((log) => new Date(log.time) >= start)
  .reduce((sum, log) => sum + (log.minutes || settings.work), 0);
  }
@@ -964,6 +1080,7 @@
  const finishedAt = new Date();
  const startedAt = phaseStartedAt ? new Date(phaseStartedAt) : new Date(finishedAt.getTime() - settings.work * 60 * 1000);
  saveLog({
+ type: 'pomodoro',
  startTime: startedAt.toISOString(),
  time: finishedAt.toISOString(),
  day: todayKey(finishedAt),
@@ -1402,8 +1519,15 @@
 
  function exportLogs() {
  const logs = loadLogs();
- const lines = ['Pomodoro Log', ''];
+ const lines = ['TomaTODO Log', ''];
  logs.forEach((log) => {
+ if (log.type === 'daily-plan') {
+ const completed = log.completedAt || log.time;
+ const completedClock = formatClock(completed);
+ const source = log.sourceDate ? `｜来自 ${log.sourceDate} ${log.sourceBucket === 'tomorrow' ? '明日计划' : '今日计划'}` : '';
+ lines.push(`[${todayKey(new Date(completed))} ${completedClock}] ✓ 计划完成 - ${log.plan || '未填写计划'}${source}`);
+ return;
+ }
  const start = formatClock(getLogStart(log));
  const end = formatClock(log.time);
  const minutes = log.minutes || settings.work;
@@ -1412,7 +1536,7 @@
  const blob = new Blob([lines.join('\n')], { type: 'text/plain;charset=utf-8' });
  const a = document.createElement('a');
  a.href = URL.createObjectURL(blob);
- a.download = `pomodoro_log_${todayKey()}.txt`;
+ a.download = `tomatodo_log_${todayKey()}.txt`;
  a.click();
  URL.revokeObjectURL(a.href);
  }
