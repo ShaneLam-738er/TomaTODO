@@ -1561,6 +1561,11 @@
  updateUI();
  queueAutoSync('本次计划已更新');
  });
+ planInput.addEventListener('keydown', (event) => {
+ if (event.key !== 'Enter') return;
+ event.preventDefault();
+ if (!isRunning) startTimer();
+ });
  planSwitchBtn.addEventListener('click', () => {
  rollDailyPlansIfNeeded();
  planView = planView === 'today' ? 'tomorrow' : 'today';
