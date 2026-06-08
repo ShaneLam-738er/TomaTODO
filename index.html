@@ -1393,7 +1393,7 @@
  return;
  }
  cell.type = 'button';
- cell.title = tooltip;
+ // 不设置 title，避免浏览器原生黑色提示框和自定义提示重复显示。
  cell.setAttribute('aria-label', tooltip.replace(/\n/g, '，'));
  const number = document.createElement('span');
  const dayNumber = day.date.getDate();
