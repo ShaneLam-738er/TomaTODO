@@ -31,7 +31,8 @@
  }
  .card,
  .today-rail,
- .daily-plan-card {
+ .daily-plan-card,
+ .study-log-panel {
  border: 1px solid rgba(148, 163, 184, 0.14);
  background: linear-gradient(180deg, rgba(31, 41, 55, 0.92), rgba(17, 24, 39, 0.98));
  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.45);
@@ -155,6 +156,45 @@
  font-size: 12px;
  font-weight: 600;
  letter-spacing: 0.08em;
+ }
+ .rail-head {
+ display: flex;
+ align-items: center;
+ justify-content: space-between;
+ gap: 8px;
+ margin-bottom: 10px;
+ }
+ .rail-head .rail-title { margin: 0; }
+ .study-log-toggle {
+ flex: 0 0 auto;
+ display: inline-flex;
+ align-items: center;
+ gap: 5px;
+ padding: 4px 8px;
+ border-radius: 999px;
+ color: #bbf7d0;
+ background: rgba(34, 197, 94, 0.08);
+ border: 1px solid rgba(34, 197, 94, 0.25);
+ font-size: 11px;
+ line-height: 1.2;
+ }
+ .study-log-toggle::before {
+ content: '';
+ width: 6px;
+ height: 6px;
+ border-radius: 999px;
+ background: var(--primary);
+ box-shadow: 0 0 10px rgba(34, 197, 94, 0.72);
+ }
+ .study-log-toggle:hover { transform: none; }
+ .study-log-toggle[aria-expanded="true"] {
+ color: #020617;
+ background: var(--primary);
+ border-color: transparent;
+ }
+ .study-log-toggle[aria-expanded="true"]::before {
+ background: #020617;
+ box-shadow: none;
  }
  .rail-summary {
  display: grid;
@@ -346,6 +386,159 @@
  line-height: 1.5;
  text-align: center;
  }
+ .study-log-panel {
+ display: none;
+ position: relative;
+ margin-bottom: 12px;
+ padding: 10px;
+ border-radius: 16px;
+ background: rgba(2, 6, 23, 0.34);
+ box-shadow: none;
+ }
+ .study-log-panel.show { display: block; }
+ .study-log-head {
+ display: flex;
+ align-items: center;
+ justify-content: space-between;
+ gap: 8px;
+ margin-bottom: 8px;
+ }
+ .study-log-title {
+ margin: 0;
+ color: var(--text);
+ font-size: 12px;
+ font-weight: 700;
+ letter-spacing: 0.04em;
+ }
+ .study-month-nav {
+ display: inline-flex;
+ align-items: center;
+ gap: 5px;
+ color: var(--muted);
+ font-size: 10px;
+ white-space: nowrap;
+ }
+ .study-month-btn {
+ width: 20px;
+ height: 20px;
+ padding: 0;
+ display: grid;
+ place-items: center;
+ color: var(--muted);
+ background: rgba(2, 6, 23, 0.32);
+ border: 1px solid rgba(148, 163, 184, 0.14);
+ border-radius: 999px;
+ font-size: 14px;
+ line-height: 1;
+ }
+ .study-month-btn:hover { transform: none; color: var(--text); border-color: rgba(148, 163, 184, 0.34); }
+ .study-log-range {
+ min-width: 48px;
+ color: var(--text);
+ font-size: 10px;
+ text-align: center;
+ }
+ .study-weekdays,
+ .study-calendar {
+ display: grid;
+ grid-template-columns: repeat(7, 1fr);
+ gap: 4px;
+ }
+ .study-weekdays {
+ margin-bottom: 4px;
+ color: var(--muted);
+ font-size: 9px;
+ text-align: center;
+ }
+ .study-weekdays span { line-height: 1.4; }
+ .study-day {
+ width: 100%;
+ aspect-ratio: 1;
+ padding: 0;
+ border-radius: 5px;
+ border: 1px solid rgba(148, 163, 184, 0.12);
+ background: rgba(148, 163, 184, 0.06);
+ color: var(--muted);
+ cursor: default;
+ position: relative;
+ transition: transform 0.12s ease, border-color 0.12s ease, background 0.12s ease;
+ }
+ .study-day-number {
+ position: absolute;
+ right: 3px;
+ bottom: 2px;
+ font-size: 8px;
+ line-height: 1;
+ opacity: 0.72;
+ font-variant-numeric: tabular-nums;
+ }
+ .study-day-number.single-digit {
+ inset: 0;
+ display: grid;
+ place-items: center;
+ font-size: 10px;
+ }
+ .study-day.is-today {
+ border-color: rgba(226, 232, 240, 0.62);
+ }
+ .study-day.outside-month {
+ visibility: hidden;
+ pointer-events: none;
+ }
+ .study-day.has-study {
+ background: rgba(34, 197, 94, var(--study-alpha, 0.32));
+ border-color: rgba(34, 197, 94, 0.34);
+ }
+ .study-day:hover,
+ .study-day:focus {
+ transform: scale(1.08);
+ border-color: rgba(226, 232, 240, 0.58);
+ outline: none;
+ z-index: 1;
+ }
+ .study-log-legend {
+ display: flex;
+ align-items: center;
+ justify-content: space-between;
+ gap: 8px;
+ margin-top: 8px;
+ color: var(--muted);
+ font-size: 10px;
+ line-height: 1.4;
+ }
+ .study-log-scale {
+ display: inline-flex;
+ align-items: center;
+ gap: 3px;
+ }
+ .study-log-scale i {
+ width: 8px;
+ height: 8px;
+ border-radius: 3px;
+ border: 1px solid rgba(148, 163, 184, 0.12);
+ background: rgba(148, 163, 184, 0.06);
+ }
+ .study-log-scale i:nth-child(2) { background: rgba(34, 197, 94, 0.24); }
+ .study-log-scale i:nth-child(3) { background: rgba(34, 197, 94, 0.46); }
+ .study-log-scale i:nth-child(4) { background: rgba(34, 197, 94, 0.72); }
+ .study-log-tooltip {
+ display: none;
+ position: fixed;
+ max-width: 260px;
+ padding: 9px 10px;
+ border-radius: 12px;
+ background: rgba(15, 23, 42, 0.98);
+ border: 1px solid rgba(148, 163, 184, 0.22);
+ color: var(--text);
+ font-size: 11px;
+ line-height: 1.45;
+ text-align: left;
+ box-shadow: 0 18px 40px rgba(0, 0, 0, 0.45);
+ pointer-events: none;
+ z-index: 10;
+ white-space: pre-line;
+ }
+ .study-log-tooltip.show { display: block; }
  details {
  margin-top: 16px;
  color: var(--muted);
@@ -558,7 +751,27 @@
  </main>
  </div>
  <aside class="today-rail" aria-label="今日完成清单">
+ <div class="rail-head">
  <p class="rail-title">今日</p>
+ <button class="study-log-toggle" id="studyLogToggle" type="button" aria-expanded="false" aria-controls="studyLogPanel">学习日志</button>
+ </div>
+ <section class="study-log-panel" id="studyLogPanel" aria-label="学习日志日历">
+ <div class="study-log-head">
+ <p class="study-log-title">月度学习</p>
+ <div class="study-month-nav" aria-label="切换学习日志月份">
+ <button class="study-month-btn" id="studyPrevMonthBtn" type="button" aria-label="上个月">‹</button>
+ <span class="study-log-range" id="studyLogRange"></span>
+ <button class="study-month-btn" id="studyNextMonthBtn" type="button" aria-label="下个月">›</button>
+ </div>
+ </div>
+ <div class="study-weekdays" aria-hidden="true"><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span><span>日</span></div>
+ <div class="study-calendar" id="studyCalendar" role="list" aria-label="每日学习贡献图"></div>
+ <div class="study-log-legend">
+ <span id="studyLogSummary">暂无学习记录</span>
+ <span class="study-log-scale" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+ </div>
+ <div class="study-log-tooltip" id="studyLogTooltip" role="tooltip"></div>
+ </section>
  <div class="rail-summary">
  <div>
  <strong id="todayRoundsText">0</strong>
@@ -590,6 +803,7 @@
  const PLAN_KEY = 'pomodoro_plan_draft';
  const SESSION_KEY = 'pomodoro_current_session';
  const DAILY_PLANS_KEY = 'pomodoro_daily_plans_v1';
+ const EXTERNAL_LOG_DATA_KEY = 'tomatodo_log_data';
  const SYNC_PROFILE_KEY = 'tomatodo_github_sync_profile';
  const SYNC_TOKEN_KEY = 'tomatodo_github_token';
  const SYNC_PASSWORD_KEY = 'tomatodo_github_password_hash';
@@ -631,6 +845,9 @@
  let syncTimer = null;
  let syncState = null;
  let lastRemoteSha = null;
+ let studyCalendarMonth = new Date();
+ studyCalendarMonth.setDate(1);
+ studyCalendarMonth.setHours(0, 0, 0, 0);
  const $ = (id) => document.getElementById(id);
  const timeText = $('timeText');
  const modeText = $('modeText');
@@ -648,6 +865,14 @@
  const todayMinutesText = $('todayMinutesText');
  const todayList = $('todayList');
  const emptyToday = $('emptyToday');
+ const studyLogToggle = $('studyLogToggle');
+ const studyLogPanel = $('studyLogPanel');
+ const studyCalendar = $('studyCalendar');
+ const studyLogRange = $('studyLogRange');
+ const studyLogSummary = $('studyLogSummary');
+ const studyLogTooltip = $('studyLogTooltip');
+ const studyPrevMonthBtn = $('studyPrevMonthBtn');
+ const studyNextMonthBtn = $('studyNextMonthBtn');
  const workInput = $('workInput');
  const shortBreakInput = $('shortBreakInput');
  const longBreakInput = $('longBreakInput');
@@ -1001,6 +1226,199 @@
  .filter((log) => new Date(log.time) >= start)
  .reduce((sum, log) => sum + (log.minutes || settings.work), 0);
  }
+ function parseTomatodoTextLogs(text) {
+ const logs = [];
+ String(text || '').split(/\r?\n/).forEach((line) => {
+ const trimmed = line.trim();
+ if (!trimmed || trimmed === 'TomaTODO Log') return;
+ const pomodoro = trimmed.match(/^\[(\d{4}-\d{2}-\d{2})\s+(\d{2}:\d{2})-(\d{2}:\d{2})\]\s+(\d+)\s*分钟\s*-\s*(.*)$/);
+ if (pomodoro) {
+ const [, day, startClock, endClock, minutesText, planText] = pomodoro;
+ const endDate = new Date(`${day}T${endClock}:00`);
+ const startDate = new Date(`${day}T${startClock}:00`);
+ if (endDate < startDate) endDate.setDate(endDate.getDate() + 1);
+ logs.push({
+ type: 'pomodoro',
+ startTime: startDate.toISOString(),
+ time: endDate.toISOString(),
+ day,
+ minutes: Number(minutesText) || settings.work,
+ plan: (planText || '').trim()
+ });
+ return;
+ }
+ const planDone = trimmed.match(/^\[(\d{4}-\d{2}-\d{2})\s+(\d{2}:\d{2})\]\s*✓\s*计划完成\s*-\s*(.*)$/);
+ if (planDone) {
+ const [, day, clock, rest] = planDone;
+ const parts = rest.split('｜');
+ const plan = (parts.shift() || '').trim();
+ const time = new Date(`${day}T${clock}:00`).toISOString();
+ logs.push({
+ type: 'daily-plan',
+ time,
+ day,
+ plan,
+ minutes: 0,
+ completedAt: time,
+ sourceText: parts.join('｜').trim()
+ });
+ }
+ });
+ return logs;
+ }
+ function normalizeTomatodoLogData(value) {
+ if (!value) return [];
+ if (Array.isArray(value)) return value;
+ if (typeof value === 'string') {
+ const parsed = safeJSON(value, null);
+ if (Array.isArray(parsed)) return parsed;
+ if (parsed?.logs && Array.isArray(parsed.logs)) return parsed.logs;
+ return parseTomatodoTextLogs(value);
+ }
+ if (Array.isArray(value.logs)) return value.logs;
+ if (Array.isArray(value.data?.logs)) return value.data.logs;
+ return [];
+ }
+ function loadExternalTomatodoLogs() {
+ const logs = [];
+ logs.push(...normalizeTomatodoLogData(window.tomatodo_log_data));
+ logs.push(...normalizeTomatodoLogData(localStorage.getItem(EXTERNAL_LOG_DATA_KEY)));
+ return logs;
+ }
+ function getAllStudyLogs(logs = loadLogs()) {
+ const merged = [...logs, ...loadExternalTomatodoLogs()];
+ const seen = new Set();
+ return merged.filter((log) => {
+ const type = log.type || 'pomodoro';
+ const time = log.time || log.completedAt || log.startTime;
+ const key = `${type}|${time}|${log.plan || ''}|${log.minutes || 0}`;
+ if (!time || seen.has(key)) return false;
+ seen.add(key);
+ return type === 'pomodoro' || type === 'daily-plan';
+ });
+ }
+ function formatStudyDate(date) {
+ return `${date.getMonth() + 1}/${date.getDate()}`;
+ }
+ function formatStudyMonth(date) {
+ return `${date.getFullYear()}年${date.getMonth() + 1}月`;
+ }
+ function getStudyDayKey(log) {
+ if (log.day) return log.day;
+ const time = log.time || log.completedAt || log.startTime;
+ return time ? todayKey(new Date(time)) : '';
+ }
+ function buildStudyCalendarDays(monthDate = studyCalendarMonth) {
+ const year = monthDate.getFullYear();
+ const month = monthDate.getMonth();
+ const first = new Date(year, month, 1);
+ const last = new Date(year, month + 1, 0);
+ const leadingBlanks = (first.getDay() + 6) % 7;
+ const totalCells = Math.ceil((leadingBlanks + last.getDate()) / 7) * 7;
+ const days = [];
+ for (let i = 0; i < totalCells; i += 1) {
+ const date = new Date(year, month, i - leadingBlanks + 1);
+ const inMonth = date.getMonth() === month;
+ days.push({ date, key: todayKey(date), inMonth, logs: [], rounds: 0, minutes: 0, plans: 0 });
+ }
+ const byDay = new Map(days.filter((day) => day.inMonth).map((day) => [day.key, day]));
+ getAllStudyLogs().forEach((log) => {
+ const key = getStudyDayKey(log);
+ const day = byDay.get(key);
+ if (!day) return;
+ day.logs.push(log);
+ if ((log.type || 'pomodoro') === 'daily-plan') day.plans += 1;
+ else {
+ day.rounds += 1;
+ day.minutes += Number(log.minutes) || settings.work;
+ }
+ });
+ return days;
+ }
+ function makeStudyTooltip(day) {
+ if (!day.logs.length) return `${day.key}\n没有学习记录`;
+ const header = `${day.key}\n${day.rounds} 轮 · ${day.minutes} 分钟${day.plans ? ` · ${day.plans} 个计划完成` : ''}`;
+ const tasks = day.logs.slice(0, 6).map((log) => {
+ const type = (log.type || 'pomodoro') === 'daily-plan' ? '✓' : '•';
+ const time = formatClock(log.time || log.completedAt || log.startTime);
+ return `${type} ${time} ${log.plan || '未填写计划'}`;
+ });
+ const rest = day.logs.length > tasks.length ? `… 还有 ${day.logs.length - tasks.length} 条` : '';
+ return [header, ...tasks, rest].filter(Boolean).join('\n');
+ }
+ function positionStudyTooltip(event) {
+ if (!studyLogTooltip.classList.contains('show')) return;
+ const padding = 10;
+ const rect = studyLogTooltip.getBoundingClientRect();
+ let left = event.clientX + 12;
+ let top = event.clientY + 12;
+ if (left + rect.width + padding > window.innerWidth) left = event.clientX - rect.width - 12;
+ if (top + rect.height + padding > window.innerHeight) top = event.clientY - rect.height - 12;
+ studyLogTooltip.style.left = `${Math.max(padding, left)}px`;
+ studyLogTooltip.style.top = `${Math.max(padding, top)}px`;
+ }
+ function showStudyTooltip(event, text) {
+ studyLogTooltip.textContent = text;
+ studyLogTooltip.classList.add('show');
+ positionStudyTooltip(event);
+ }
+ function hideStudyTooltip() {
+ studyLogTooltip.classList.remove('show');
+ }
+ function renderStudyCalendar() {
+ if (!studyCalendar) return;
+ const days = buildStudyCalendarDays(studyCalendarMonth);
+ const monthDays = days.filter((day) => day.inMonth);
+ const maxRounds = Math.max(1, ...monthDays.map((day) => day.rounds));
+ const activeDays = monthDays.filter((day) => day.logs.length);
+ const totalRounds = monthDays.reduce((sum, day) => sum + day.rounds, 0);
+ const totalMinutes = monthDays.reduce((sum, day) => sum + day.minutes, 0);
+ const totalPlans = monthDays.reduce((sum, day) => sum + day.plans, 0);
+ studyLogRange.textContent = formatStudyMonth(studyCalendarMonth);
+ studyLogSummary.textContent = activeDays.length
+ ? `${activeDays.length} 天 · ${totalRounds} 轮 · ${totalMinutes} 分钟${totalPlans ? ` · ${totalPlans} 个计划` : ''}`
+ : '本月暂无学习记录';
+ studyCalendar.replaceChildren();
+ days.forEach((day) => {
+ const cell = document.createElement(day.inMonth ? 'button' : 'span');
+ const tooltip = makeStudyTooltip(day);
+ const alpha = day.logs.length ? Math.min(0.88, 0.22 + (day.rounds / maxRounds) * 0.58 + Math.min(day.plans, 3) * 0.04) : 0;
+ const isToday = day.key === todayKey();
+ cell.className = `study-day${day.logs.length ? ' has-study' : ''}${day.inMonth ? '' : ' outside-month'}${isToday ? ' is-today' : ''}`;
+ cell.style.setProperty('--study-alpha', alpha.toFixed(2));
+ cell.setAttribute('role', 'listitem');
+ if (!day.inMonth) {
+ cell.setAttribute('aria-hidden', 'true');
+ studyCalendar.append(cell);
+ return;
+ }
+ cell.type = 'button';
+ cell.title = tooltip;
+ cell.setAttribute('aria-label', tooltip.replace(/\n/g, '，'));
+ const number = document.createElement('span');
+ const dayNumber = day.date.getDate();
+ number.className = `study-day-number${dayNumber < 10 ? ' single-digit' : ''}`;
+ number.textContent = String(dayNumber);
+ cell.append(number);
+ cell.addEventListener('mouseenter', (event) => showStudyTooltip(event, tooltip));
+ cell.addEventListener('mousemove', positionStudyTooltip);
+ cell.addEventListener('mouseleave', hideStudyTooltip);
+ cell.addEventListener('focus', (event) => showStudyTooltip(event, tooltip));
+ cell.addEventListener('blur', hideStudyTooltip);
+ studyCalendar.append(cell);
+ });
+ }
+ function shiftStudyMonth(delta) {
+ studyCalendarMonth = new Date(studyCalendarMonth.getFullYear(), studyCalendarMonth.getMonth() + delta, 1);
+ studyCalendarMonth.setHours(0, 0, 0, 0);
+ renderStudyCalendar();
+ }
+ function toggleStudyLog() {
+ const expanded = studyLogToggle.getAttribute('aria-expanded') === 'true';
+ studyLogToggle.setAttribute('aria-expanded', String(!expanded));
+ studyLogPanel.classList.toggle('show', !expanded);
+ if (!expanded) renderStudyCalendar();
+ }
  function updateStats() {
  const logs = loadLogs();
  const todayLogs = getTodayLogs(logs);
@@ -1022,6 +1440,7 @@
  li.append(time, task);
  todayList.append(li);
  });
+ renderStudyCalendar();
  }
  function phaseName() {
  if (!isBreak) return '专注中';
@@ -1544,6 +1963,9 @@
  resetBtn.addEventListener('click', resetTimer);
  skipBtn.addEventListener('click', () => setPhase(false, settings.work * 60, false));
  exportBtn.addEventListener('click', exportLogs);
+ studyLogToggle.addEventListener('click', toggleStudyLog);
+ studyPrevMonthBtn.addEventListener('click', () => shiftStudyMonth(-1));
+ studyNextMonthBtn.addEventListener('click', () => shiftStudyMonth(1));
  clearBtn.addEventListener('click', () => {
  if (!confirm('确定清空所有番茄钟记录吗？这个操作不能撤销。')) return;
  saveLogs([]);
@@ -1599,6 +2021,7 @@
  restoreSession();
  updateStats();
  renderDailyPlans();
+ renderStudyCalendar();
  restoreSavedSyncLogin();
  updateUI();
  initialized = true;
