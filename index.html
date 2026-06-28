@@ -647,6 +647,130 @@
  line-height: 1.55;
  text-align: left;
  }
+ .phase-alert {
+ position: fixed;
+ inset: 0;
+ z-index: 50;
+ display: grid;
+ place-items: center;
+ padding: 24px;
+ background: rgba(2, 6, 23, 0.82);
+ backdrop-filter: blur(9px);
+ opacity: 0;
+ pointer-events: none;
+ transition: opacity 0.18s ease;
+ }
+ .phase-alert.show {
+ opacity: 1;
+ pointer-events: auto;
+ }
+ .phase-alert[hidden] { display: none; }
+ .phase-alert[data-kind="work"] { --alert: #f97316; --alert-soft: rgba(249, 115, 22, 0.18); }
+ .phase-alert[data-kind="break"] { --alert: #38bdf8; --alert-soft: rgba(56, 189, 248, 0.18); }
+ .phase-alert-dialog {
+ width: min(440px, 100%);
+ padding: 28px 26px 24px;
+ border: 1px solid color-mix(in srgb, var(--alert) 58%, transparent);
+ border-radius: 24px;
+ background: linear-gradient(180deg, rgba(15, 23, 42, 0.98), rgba(2, 6, 23, 0.98));
+ box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.04), 0 30px 90px rgba(0, 0, 0, 0.62), 0 0 46px var(--alert-soft);
+ text-align: center;
+ animation: alertPop 0.24s ease;
+ }
+ .phase-alert-rings {
+ position: relative;
+ width: 74px;
+ height: 74px;
+ margin: 0 auto 16px;
+ display: grid;
+ place-items: center;
+ border-radius: 999px;
+ background: var(--alert-soft);
+ }
+ .phase-alert-rings::before {
+ content: '';
+ width: 28px;
+ height: 28px;
+ border-radius: inherit;
+ background: var(--alert);
+ box-shadow: 0 0 22px color-mix(in srgb, var(--alert) 72%, transparent);
+ }
+ .phase-alert-rings span {
+ position: absolute;
+ inset: 5px;
+ border: 2px solid var(--alert);
+ border-radius: inherit;
+ opacity: 0;
+ animation: alertRing 1.45s ease-out infinite;
+ }
+ .phase-alert-rings span:nth-child(2) { animation-delay: 0.28s; }
+ .phase-alert-rings span:nth-child(3) { animation-delay: 0.56s; }
+ .phase-alert-kicker {
+ margin: 0 0 8px;
+ color: var(--alert);
+ font-size: 12px;
+ font-weight: 700;
+ letter-spacing: 0.18em;
+ }
+ .phase-alert-title {
+ margin: 0;
+ color: #f8fafc;
+ font-size: 34px;
+ line-height: 1.12;
+ }
+ .phase-alert-message {
+ margin: 13px 0 0;
+ color: #cbd5e1;
+ font-size: 15px;
+ line-height: 1.7;
+ }
+ .phase-alert-next {
+ margin: 16px auto 0;
+ padding: 10px 12px;
+ border-radius: 14px;
+ color: #f8fafc;
+ background: rgba(15, 23, 42, 0.78);
+ border: 1px solid rgba(148, 163, 184, 0.18);
+ font-size: 14px;
+ font-variant-numeric: tabular-nums;
+ }
+ .phase-alert-actions {
+ display: grid;
+ grid-template-columns: 1fr 1fr;
+ gap: 10px;
+ margin-top: 20px;
+ }
+ .phase-alert-actions button:first-child {
+ background: var(--alert);
+ }
+ body.phase-alert-active .card {
+ border-color: color-mix(in srgb, var(--primary) 56%, white 10%);
+ animation: cardAlertPulse 1.2s ease-in-out infinite;
+ }
+ body.phase-alert-active .time {
+ text-shadow: 0 0 24px color-mix(in srgb, var(--primary) 72%, transparent);
+ }
+ @keyframes alertPop {
+ from { transform: translateY(12px) scale(0.98); opacity: 0; }
+ to { transform: translateY(0) scale(1); opacity: 1; }
+ }
+ @keyframes alertRing {
+ 0% { transform: scale(0.72); opacity: 0.82; }
+ 100% { transform: scale(1.34); opacity: 0; }
+ }
+ @keyframes cardAlertPulse {
+ 0%, 100% { box-shadow: 0 24px 70px rgba(0, 0, 0, 0.45); }
+ 50% { box-shadow: 0 24px 70px rgba(0, 0, 0, 0.45), 0 0 38px color-mix(in srgb, var(--primary) 42%, transparent); }
+ }
+ @media (prefers-reduced-motion: reduce) {
+ .phase-alert,
+ .phase-alert-dialog,
+ .phase-alert-rings span,
+ body.phase-alert-active .card {
+ transition: none;
+ animation: none;
+ }
+ }
 
  @media (max-width: 760px) {
  body { align-items: flex-start; }
@@ -797,6 +921,19 @@
  <div class="empty-plan" id="emptyPlanText">暂无计划</div>
  </section>
  </aside>
+ <div class="phase-alert" id="phaseAlert" role="dialog" aria-modal="true" aria-labelledby="phaseAlertTitle" aria-describedby="phaseAlertMessage" data-kind="work" hidden>
+ <div class="phase-alert-dialog">
+ <div class="phase-alert-rings" aria-hidden="true"><span></span><span></span><span></span></div>
+ <p class="phase-alert-kicker" id="phaseAlertKicker">时间到</p>
+ <h2 class="phase-alert-title" id="phaseAlertTitle">专注结束</h2>
+ <p class="phase-alert-message" id="phaseAlertMessage">这一轮已经完成，先休息一下。</p>
+ <p class="phase-alert-next" id="phaseAlertNext">下一段：短休息 05:00</p>
+ <div class="phase-alert-actions">
+ <button id="alertStartNextBtn" type="button">开始下一段</button>
+ <button id="alertDismissBtn" type="button" class="secondary">我知道了</button>
+ </div>
+ </div>
+ </div>
  <script>
  const STORAGE_KEY = 'pomodoro_logs';
  const SETTINGS_KEY = 'pomodoro_settings';
@@ -823,6 +960,8 @@
  longBreak: 15,
  longBreakEvery: 4
  };
+ const ALERT_SOUND_REPEAT_MS = 2800;
+ const ALERT_TITLE_FLASH_MS = 900;
  const DEFAULT_DAILY_PLANS = () => ({
  date: todayKey(),
  today: [],
@@ -846,6 +985,10 @@
  let syncState = null;
  let lastRemoteSha = null;
  let studyCalendarMonth = new Date();
+ let activeAlert = null;
+ let alertSoundTimer = null;
+ let titleFlashTimer = null;
+ let titleFlashVisible = false;
  studyCalendarMonth.setDate(1);
  studyCalendarMonth.setHours(0, 0, 0, 0);
  const $ = (id) => document.getElementById(id);
@@ -897,6 +1040,13 @@
  const syncPullBtn = $('syncPullBtn');
  const syncLogoutBtn = $('syncLogoutBtn');
  const syncStatusText = $('syncStatusText');
+ const phaseAlert = $('phaseAlert');
+ const phaseAlertKicker = $('phaseAlertKicker');
+ const phaseAlertTitle = $('phaseAlertTitle');
+ const phaseAlertMessage = $('phaseAlertMessage');
+ const phaseAlertNext = $('phaseAlertNext');
+ const alertStartNextBtn = $('alertStartNextBtn');
+ const alertDismissBtn = $('alertDismissBtn');
  function safeJSON(value, fallback) {
  try { return JSON.parse(value) ?? fallback; } catch { return fallback; }
  }
@@ -1195,19 +1345,128 @@
  resumeNote.textContent = `已恢复上次未完成的${isBreak ? '休息' : '番茄钟'}，点击“开始”继续。`;
  resumeNote.classList.add('show');
  }
- function playBeep() {
+ function buildDocumentTitle() {
+ const plan = planInput.value.trim();
+ return `${format(remaining)} · ${isBreak ? (isLongBreak ? '长休息' : '休息') : '专注'}${plan ? '｜' + plan : ''}`;
+ }
+ function requestNotificationPermission() {
+ if (!('Notification' in window) || Notification.permission !== 'default') return;
+ const request = Notification.requestPermission();
+ if (request?.catch) request.catch(() => {});
+ }
+ function showSystemNotification(alert) {
+ if (!('Notification' in window) || Notification.permission !== 'granted') return;
+ try {
+ const notification = new Notification(alert.title, {
+ body: `${alert.message} ${alert.next}`,
+ tag: 'tomatodo-phase-alert',
+ requireInteraction: true
+ });
+ notification.onclick = () => {
+ window.focus();
+ notification.close();
+ };
+ } catch {}
+ }
+ function playBeep(kind = 'work') {
  const AudioContext = window.AudioContext || window.webkitAudioContext;
  if (!AudioContext) return;
  const ctx = new AudioContext();
+ if (ctx.state === 'suspended') ctx.resume().catch(() => {});
+ const tones = kind === 'break' ? [660, 880, 660] : [880, 1175, 988, 1175];
+ const volume = kind === 'break' ? 0.18 : 0.2;
+ tones.forEach((frequency, index) => {
+ const start = ctx.currentTime + index * 0.16;
  const osc = ctx.createOscillator();
  const gain = ctx.createGain();
- osc.type = 'sine';
- osc.frequency.value = isBreak ? 660 : 880;
- gain.gain.value = 0.16;
+ osc.type = index % 2 ? 'triangle' : 'sine';
+ osc.frequency.value = frequency;
+ gain.gain.setValueAtTime(0.001, start);
+ gain.gain.linearRampToValueAtTime(volume, start + 0.025);
+ gain.gain.exponentialRampToValueAtTime(0.001, start + 0.15);
  osc.connect(gain).connect(ctx.destination);
- osc.start();
- gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.45);
- setTimeout(() => { osc.stop(); ctx.close(); }, 500);
+ osc.start(start);
+ osc.stop(start + 0.18);
+ });
+ setTimeout(() => ctx.close(), tones.length * 180 + 320);
+ }
+ function stopAlertSound() {
+ clearInterval(alertSoundTimer);
+ alertSoundTimer = null;
+ if (navigator.vibrate) navigator.vibrate(0);
+ }
+ function startAlertSound(kind) {
+ stopAlertSound();
+ const ring = () => {
+ playBeep(kind);
+ if (navigator.vibrate) navigator.vibrate([240, 80, 240, 80, 380]);
+ };
+ ring();
+ alertSoundTimer = setInterval(ring, ALERT_SOUND_REPEAT_MS);
+ }
+ function stopTitleFlash() {
+ clearInterval(titleFlashTimer);
+ titleFlashTimer = null;
+ titleFlashVisible = false;
+ }
+ function startTitleFlash(alert) {
+ stopTitleFlash();
+ const urgentTitle = `时间到！${alert.title}`;
+ const nextTitle = alert.next.replace('下一段：', '');
+ const flash = () => {
+ titleFlashVisible = !titleFlashVisible;
+ document.title = titleFlashVisible ? urgentTitle : nextTitle;
+ };
+ flash();
+ titleFlashTimer = setInterval(flash, ALERT_TITLE_FLASH_MS);
+ }
+ function phaseAlertCopy(kind) {
+ const nextName = isBreak ? (isLongBreak ? '长休息' : '短休息') : '专注';
+ if (kind === 'work') {
+ return {
+ kind,
+ kicker: '时间到',
+ title: '专注结束',
+ message: `这一轮已完成并记录，现在该${isLongBreak ? '长休息' : '短休息'}了。`,
+ next: `下一段：${nextName} ${format(remaining)}`
+ };
+ }
+ return {
+ kind,
+ kicker: '休息结束',
+ title: '休息结束',
+ message: '休息时间到了，回到下一轮专注。',
+ next: `下一段：${nextName} ${format(remaining)}`
+ };
+ }
+ function updatePhaseAlert(alert) {
+ phaseAlert.dataset.kind = alert.kind;
+ phaseAlertKicker.textContent = alert.kicker;
+ phaseAlertTitle.textContent = alert.title;
+ phaseAlertMessage.textContent = alert.message;
+ phaseAlertNext.textContent = alert.next;
+ alertStartNextBtn.textContent = isBreak ? '开始休息' : '开始专注';
+ }
+ function startPhaseAlert(kind) {
+ activeAlert = phaseAlertCopy(kind);
+ updatePhaseAlert(activeAlert);
+ phaseAlert.hidden = false;
+ requestAnimationFrame(() => phaseAlert.classList.add('show'));
+ document.body.classList.add('phase-alert-active');
+ startAlertSound(kind);
+ startTitleFlash(activeAlert);
+ showSystemNotification(activeAlert);
+ alertStartNextBtn.focus({ preventScroll: true });
+ }
+ function dismissPhaseAlert({ skipUpdate = false } = {}) {
+ if (!activeAlert && phaseAlert.hidden) return;
+ activeAlert = null;
+ stopAlertSound();
+ stopTitleFlash();
+ phaseAlert.classList.remove('show');
+ phaseAlert.hidden = true;
+ document.body.classList.remove('phase-alert-active');
+ if (!skipUpdate) updateUI();
  }
  function getPomodoroLogs(logs = loadLogs()) {
  return logs.filter((log) => (log.type || 'pomodoro') === 'pomodoro');
@@ -1455,7 +1714,7 @@
  const progress = totalForPhase > 0 ? 100 - (remaining / totalForPhase) * 100 : 0;
  progressBar.style.width = `${Math.max(0, Math.min(100, progress))}%`;
  document.documentElement.style.setProperty('--primary', isBreak ? 'var(--break)' : '#22c55e');
- document.title = `${format(remaining)} · ${isBreak ? (isLongBreak ? '长休息' : '休息') : '专注'}${plan ? '｜' + plan : ''}`;
+ if (!activeAlert) document.title = buildDocumentTitle();
  saveSession();
  }
  function syncRemainingFromClock() {
@@ -1464,6 +1723,8 @@
  }
  function startTimer() {
  if (isRunning) return;
+ dismissPhaseAlert({ skipUpdate: true });
+ requestNotificationPermission();
  restoredSession = false;
  resumeNote.classList.remove('show');
  if (!phaseStartedAt) phaseStartedAt = Date.now();
@@ -1481,6 +1742,7 @@
  updateUI();
  }
  function setPhase(nextIsBreak, seconds, longBreak = false) {
+ dismissPhaseAlert({ skipUpdate: true });
  clearInterval(timer);
  timer = null;
  isRunning = false;
@@ -1494,7 +1756,7 @@
  updateUI();
  }
  function finishPhase() {
- playBeep();
+ const completedKind = isBreak ? 'break' : 'work';
  if (!isBreak) {
  const finishedAt = new Date();
  const startedAt = phaseStartedAt ? new Date(phaseStartedAt) : new Date(finishedAt.getTime() - settings.work * 60 * 1000);
@@ -1515,6 +1777,7 @@
  } else {
  setPhase(false, settings.work * 60, false);
  }
+ startPhaseAlert(completedKind);
  }
  function tick() {
  syncRemainingFromClock();
@@ -1962,6 +2225,13 @@
  startBtn.addEventListener('click', () => isRunning ? pauseTimer() : startTimer());
  resetBtn.addEventListener('click', resetTimer);
  skipBtn.addEventListener('click', () => setPhase(false, settings.work * 60, false));
+ alertDismissBtn.addEventListener('click', () => dismissPhaseAlert());
+ alertStartNextBtn.addEventListener('click', () => startTimer());
+ document.addEventListener('keydown', (event) => {
+ if (!activeAlert || event.key !== 'Escape') return;
+ event.preventDefault();
+ dismissPhaseAlert();
+ });
  exportBtn.addEventListener('click', exportLogs);
  studyLogToggle.addEventListener('click', toggleStudyLog);
  studyPrevMonthBtn.addEventListener('click', () => shiftStudyMonth(-1));
